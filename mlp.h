@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "../../intrinsics/vima/vima.hpp"
+#include "vima.hpp"
 
 typedef struct base_type {
     __v64d *base;
