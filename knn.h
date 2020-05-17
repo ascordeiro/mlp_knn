@@ -14,7 +14,7 @@ typedef struct base_type {
 
 int train_lines = 0, test_lines = 0, columns = 0, len_ivector, instances, tr_ientries, te_ientries, v_neg = 0, f_neg = 0, v_pos = 0, f_pos = 0, vector_size;
 int VSIZE, k;
-int training_instances, training_features, v_trsize, ed_idx = 0;
+int training_instances, training_features, v_trsize, ed_idx = 0, label_instances;
 
 // void euclidean_distance_256b(__v32d *train_base, __v32d *test_base, __v32d **e_distance, __v32d *partial_sub, __v32d *partial_mul, int n_vectest, int index)
 // {

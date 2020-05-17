@@ -20,12 +20,20 @@ void read_files(char const *argv[], base_type *train_base) {
         n_vectors = 1;
     }
 
+    label_instances = 1;
+    if (training_instances > VSIZE) {
+        label_instances = training_instances/VSIZE;
+    }
+
     train_base->base = (__v64d *)malloc(sizeof(__v64d) * training_instances * n_vectors * VSIZE);
-    train_base->label = (__v32u *)malloc(sizeof(__v32u) * training_instances);
+    train_base->label = (__v32u *)malloc(sizeof(__v32u) * label_instances * VSIZE);
     if (!train_base->base || !train_base->label) {
         printf("Cannot allocate training base\n");
         exit(1);
     }
+
+// conta até o #instancias e lê o label, conta até o #carac e lê as caracs
+// se o #carac for menor que o tamanho do vetor VIMA, divide VIMA/#carac para descobrir quantas repetições das entradas vai ter naquele vetor
 
     for (i = 0; i < training_instances; ++i) {
         if (fscanf(f, "%u ", &train_base->label[i]));
@@ -38,7 +46,6 @@ void read_files(char const *argv[], base_type *train_base) {
             }
         }
     }
-
     fclose(f);
 }
 
@@ -108,17 +115,18 @@ void classification(char const *argv[], base_type *train_base) {
     __v64d *copy_mul = (__v64d *)malloc(sizeof(__v64d) * v_tesize * VSIZE);
     __v64d *partial_and = (__v64d *)malloc(sizeof(__v64d) * VSIZE);
     __v64d *vand = (__v64d *)malloc(sizeof(__v64d) * VSIZE);
-    __v32u *copy_label = (__v32u *)malloc(sizeof(__v32u) * training_instances);
+    __v32u *copy_label = (__v32u *)malloc(sizeof(__v32u) * label_instances * VSIZE);
 
+// para cada instância de teste, lê o label, e lê quantas instâncias couberem no vetor
     for (i = 0; i < test_instances; i += n_instances) {
         ed_idx = 0;
         for (j = 0; j < n_instances; ++j) {
             if (fscanf(f, "%u ", &test_base.label[j]));
             for (jj = j * test_features; jj < (j * test_features) + test_features; ++jj) {
                 if (fscanf(f, "%lf ", &test_base.base[jj]));
-            } 
+            }
         }
-
+// Para cada instância/vetor subtrai as instâncias de treino e teste e eleva ao quadrado
         for (j = 0; j < training_instances * VSIZE * v_tesize; j += v_tesize * VSIZE) {
             sum = 0.0;
             if (vector_size == 256) {
@@ -127,7 +135,9 @@ void classification(char const *argv[], base_type *train_base) {
                     _vim32_dsubs(&train_base->base[jj], &test_base.base[ii], &partial_sub[ii]);
                     _vim32_dmuls(&partial_sub[ii], &partial_sub[ii], &partial_mul[ii]);
                 }
+                // se #carac < VIMA
                 if (test_features < VSIZE) {
+                    // acumula o valor de cada instância e salva no vetor de distancia euclidiana
                     for (jj = 0; jj < n_instances; ++jj) {
                         partial_sum = 0.0;
                         for (ii = jj * test_features; ii < (jj * test_features) + test_features; ++ii) {
@@ -169,11 +179,11 @@ void classification(char const *argv[], base_type *train_base) {
         }
         __v32u *knn = (__v32u *)malloc(sizeof(__v32u) * k);
         if (vector_size == 256) {
-            for (j = 0; j < training_instances; j += VSIZE) {
+            for (j = 0; j < label_instances * VSIZE; j += VSIZE) {
                 _vim64_icpyu(&copy_label[j], &train_base->label[j]);
             }
         } else {
-            for (j = 0; j < training_instances; j += VSIZE) {
+            for (j = 0; j < label_instances * VSIZE; j += VSIZE) {
                 _vim2K_icpyu(&copy_label[j], &train_base->label[j]);
             }
         }
@@ -187,7 +197,7 @@ void classification(char const *argv[], base_type *train_base) {
     fclose(f);
     for (i = 0; i < n_instances; i++) {
         free(e_distance[i]);
-    }    
+    }
     free(e_distance);
     free(partial_sub);
     free(partial_mul);
@@ -206,7 +216,7 @@ int main(int argc, char const *argv[]) {
     // Initialize train and test matrix
     read_files(argv, &train_base);
 
-    // Calculates Euclidean Distance
+    // // Calculates Euclidean Distance
     classification(argv, &train_base);
 
     clock_t end = clock();
