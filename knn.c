@@ -32,9 +32,6 @@ void read_files(char const *argv[], base_type *train_base) {
         exit(1);
     }
 
-// conta até o #instancias e lê o label, conta até o #carac e lê as caracs
-// se o #carac for menor que o tamanho do vetor VIMA, divide VIMA/#carac para descobrir quantas repetições das entradas vai ter naquele vetor
-
     for (i = 0; i < training_instances; ++i) {
         if (fscanf(f, "%u ", &train_base->label[i]));
         for (j = 0; j < training_features; ++j) {
@@ -115,9 +112,7 @@ void classification(char const *argv[], base_type *train_base) {
     __v64d *copy_mul = (__v64d *)malloc(sizeof(__v64d) * v_tesize * VSIZE);
     __v64d *partial_and = (__v64d *)malloc(sizeof(__v64d) * VSIZE);
     __v64d *vand = (__v64d *)malloc(sizeof(__v64d) * VSIZE);
-    __v32u *copy_label = (__v32u *)malloc(sizeof(__v32u) * label_instances * VSIZE);
 
-// para cada instância de teste, lê o label, e lê quantas instâncias couberem no vetor
     for (i = 0; i < test_instances; i += n_instances) {
         ed_idx = 0;
         for (j = 0; j < n_instances; ++j) {
@@ -126,18 +121,14 @@ void classification(char const *argv[], base_type *train_base) {
                 if (fscanf(f, "%lf ", &test_base.base[jj]));
             }
         }
-// Para cada instância/vetor subtrai as instâncias de treino e teste e eleva ao quadrado
         for (j = 0; j < training_instances * VSIZE * v_tesize; j += v_tesize * VSIZE) {
             sum = 0.0;
             if (vector_size == 256) {
-                // euclidean_distance_256b(train_base->base, test_base.base, e_distance, partial_sub, partial_mul, n_instances, j);
                 for (jj = j, ii = 0; jj < j + (v_tesize * VSIZE) && ii < (v_tesize * VSIZE); jj += VSIZE, ii += VSIZE) {
                     _vim32_dsubs(&train_base->base[jj], &test_base.base[ii], &partial_sub[ii]);
                     _vim32_dmuls(&partial_sub[ii], &partial_sub[ii], &partial_mul[ii]);
                 }
-                // se #carac < VIMA
                 if (test_features < VSIZE) {
-                    // acumula o valor de cada instância e salva no vetor de distancia euclidiana
                     for (jj = 0; jj < n_instances; ++jj) {
                         partial_sum = 0.0;
                         for (ii = jj * test_features; ii < (jj * test_features) + test_features; ++ii) {
@@ -154,7 +145,6 @@ void classification(char const *argv[], base_type *train_base) {
                     e_distance[0][ed_idx++] = sqrt(sum);
                 }
             } else {
-                // euclidean_distance_8Kb(train_base->base, test_base.base, e_distance, partial_sub, partial_mul, n_instances, j);
                 for (jj = j, ii = 0; jj < j + (v_tesize * VSIZE) && ii < (v_tesize * VSIZE); jj += VSIZE, ii += VSIZE) {
                     _vim1K_dsubs(&train_base->base[jj], &test_base.base[ii], &partial_sub[ii]);
                     _vim1K_dmuls(&partial_sub[ii], &partial_sub[ii], &partial_mul[ii]);
@@ -178,17 +168,8 @@ void classification(char const *argv[], base_type *train_base) {
             }
         }
         __v32u *knn = (__v32u *)malloc(sizeof(__v32u) * k);
-        if (vector_size == 256) {
-            for (j = 0; j < label_instances * VSIZE; j += VSIZE) {
-                _vim64_icpyu(&copy_label[j], &train_base->label[j]);
-            }
-        } else {
-            for (j = 0; j < label_instances * VSIZE; j += VSIZE) {
-                _vim2K_icpyu(&copy_label[j], &train_base->label[j]);
-            }
-        }
         for (j = 0, jj = i; j < n_instances && jj < i + n_instances; ++j, ++jj) {
-            get_ksmallest(e_distance[j], copy_label, knn, k);
+            get_ksmallest(e_distance[j], train_base->label, knn, k);
             printf("%u. ", jj);
             votes(knn, test_base.label[0], k);
         }
@@ -204,7 +185,6 @@ void classification(char const *argv[], base_type *train_base) {
     free(partial_and);
     free(copy_mul);
     free(vand);
-    free(copy_label);
     free(test_base.base);
     free(test_base.label);
 }
