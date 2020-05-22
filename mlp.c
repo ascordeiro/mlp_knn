@@ -76,6 +76,31 @@ __v64d *formated_hidden_weights(int fw_size, int instances) {
     return f_w;
 }
 
+__v64d **create_mask_hidden(int size, int stride) {
+    int inst_size = ((training_features/2) * training_features), k = 0;
+    __v64d **mask = (__v64d **)malloc(sizeof(__v64d *) * size);
+    for (int i = 0; i < size; ++i) {
+        mask[i] = (__v64d *)malloc(sizeof(__v64d) * VSIZE);
+    }
+
+    for (int i = 0; i < size; ++i) {
+        if (k == stride) {
+            k = 0;
+        }
+        if (VSIZE == 256 || (VSIZE == 8192 && training_features >= 64)) {
+            for (int j = i; j < VSIZE; j += stride) {
+                mask[i][j] = 1.0;
+            }
+        } else {
+            for (int j = ((i/stride) * inst_size) + k; j < ((i/stride) * inst_size) + inst_size; j += stride) {
+                mask[i][j] = 1.0;
+            }
+            ++k;
+        }
+    }
+    return mask;
+}
+
 __v64d *relu_layer(base_type *train_base) {
     int i, j, k, l = 0, h_idx = 0;
     int fw_size = (training_features / 2) / n_instances;
@@ -90,8 +115,20 @@ __v64d *relu_layer(base_type *train_base) {
 
     __v64d *partial_mul = (__v64d *)malloc(sizeof(__v64d) * fw_size * n_vectors * VSIZE);
     __v64d *partial_sum = (__v64d *)malloc(sizeof(__v64d) * fw_size * n_vectors * VSIZE);
+    __v64d *partial_acc = (__v64d *)malloc(sizeof(__v64d) * VSIZE);
     __v64d *hidden_layer = (__v64d *)malloc(sizeof(__v64d) * hidden_size);
-    __v64d sum, p_sum;
+    __v64d sum, p_sum, **mask;
+
+    int m_size, stride;
+    if (VSIZE == 256 || (VSIZE == 8192 && training_features >= 64)) {
+        stride = VSIZE/training_features;
+        m_size = stride;
+
+    } else {
+        stride = training_features/2;
+        m_size = (VSIZE/(training_features * (training_features/2))) * stride;
+    }
+    mask = create_mask_hidden(m_size, stride);
 
     bias = (__v64d *)malloc(sizeof(__v64d) * VSIZE);
     if (vector_size == 256) {
@@ -116,15 +153,9 @@ __v64d *relu_layer(base_type *train_base) {
                     ++h_idx;
                 }
             } else {
-                for (j = 0; j < training_features/2; ++j) {
-                    sum = 0.0;
-                    if (l == instances) {
-                        l = 0;
-                    }
-                    for (k = l; k < VSIZE; k += instances) {
-                        sum += partial_sum[j / instances * VSIZE + k];
-                    }
-                    l++;
+                for (j = 0; j < m_size; ++j) {
+                    _vim32_dmuls(mask[k], partial_mul, partial_acc);
+                    _vim32_dcums(partial_acc, &sum);
                     if (sum > 0.0) {
                         hidden_layer[h_idx] = sum;
                     }
@@ -154,40 +185,24 @@ __v64d *relu_layer(base_type *train_base) {
                     ++h_idx;
                 }
             } else {
-                if (training_features <= 32) {
-                    for (j = 0; j < VSIZE; j += training_features * (training_features / 2)) {
-                        for (k = j; k < j + (training_features/2); ++k) {
-                            sum = 0.0;
-                            for (l = k; l < j + training_features * (training_features / 2); l += instances) {
-                                sum += partial_sum[l];
-                            }
-                            if (sum > 0.0) {
-                                hidden_layer[h_idx] = sum;
-                            }
-                            ++h_idx;
-                        }
-                    }    
-                } else {
-                    for (j = 0; j < training_features/2; ++j) {
-                        sum = 0.0;
-                        if (l == n_instances) {
-                            l = 0;
-                        }
-                        for (k = l; k < VSIZE; k += n_instances) {
-                            sum += partial_sum[j / n_instances * VSIZE + k];
-                        }
-                        l++;
-                        if (sum > 0.0) {
-                            hidden_layer[h_idx] = sum;
-                        }
-                        ++h_idx;
+                for (j = 0; j < m_size; ++j) {
+                    _vim1K_dmuls(mask[k], partial_mul, partial_acc);
+                    _vim1K_dcums(partial_acc, &sum);
+                    if (sum > 0.0) {
+                        hidden_layer[h_idx] = sum;
                     }
+                     ++h_idx;
                 }
             }
         }
     }
+    for (i = 0; i < m_size; i++) {
+        free(mask[i]);
+    }
+    free(mask);
     free(partial_mul);
     free(partial_sum);
+    free(partial_acc);
     free(f_weights);
     return hidden_layer;
 }
@@ -206,6 +221,18 @@ __v64d *formated_output_weights() {
     return f_w;
 }
 
+__v64d **create_mask_output(int n_instances) {
+    int w_size = training_features/2;
+    __v64d **mask = (__v64d **)malloc(sizeof(__v64d *) * n_instances);
+    for (int i = 0; i < n_instances; ++i) {
+        mask[i] = (__v64d *)calloc(VSIZE, sizeof(__v64d));
+        for (int j = i * w_size; j < (i * w_size) + w_size; ++j) {
+            mask[i][j] = 1.0;
+        }
+    }
+    return mask;
+}
+
 __v64d *softmax_layer(__v64d *hidden_layer) {
     int i, j, k, o_idx = 0;
     __v64d sum, p_sum;
@@ -219,7 +246,13 @@ __v64d *softmax_layer(__v64d *hidden_layer) {
 
     __v64d *partial_mul = (__v64d *)malloc(sizeof(__v64d) * VSIZE * out_inst_size * output_size);
     __v64d *partial_sum = (__v64d *)malloc(sizeof(__v64d) * VSIZE * out_inst_size * output_size);
-    
+    __v64d *partial_acc = (__v64d *)malloc(sizeof(__v64d) * VSIZE);
+
+    __v64d **mask;
+    if (VSIZE/(training_features/2) > 1) {
+        mask = create_mask_output(VSIZE/(training_features/2));
+    }
+
     if (vector_size == 256) {
         for (i = 0; i < hidden_size; i += VSIZE * out_inst_size) {
             for (j = 0; j < output_size * VSIZE; j += VSIZE) {
@@ -241,11 +274,9 @@ __v64d *softmax_layer(__v64d *hidden_layer) {
                     ++o_idx;
                 }
             } else {
-                for (j = 0; j < VSIZE; j += training_features/2) {
-                    sum = 0.0;
-                    for (k = j; k < j + training_features/2; ++k) {
-                        sum += partial_sum[k];
-                    }
+                for (j = 0; j < VSIZE/(training_features/2); ++j) {
+                    _vim32_dmuls(mask[j], partial_mul, partial_acc);
+                    _vim32_dcums(partial_acc, &sum);
                     if (sum > 0.0) {
                         output_layer[o_idx] = sum;
                     }
@@ -274,11 +305,9 @@ __v64d *softmax_layer(__v64d *hidden_layer) {
                     ++o_idx;
                 }
             } else {
-                for (j = 0; j < VSIZE; j += training_features/2) {
-                    sum = 0.0;
-                    for (k = j; k < j + training_features/2; ++k) {
-                        sum += partial_sum[k];
-                    }
+                for (j = 0; j < VSIZE/(training_features/2); ++j) {
+                    _vim1K_dmuls(mask[j], partial_mul, partial_acc);
+                    _vim1K_dcums(partial_acc, &sum);
                     if (sum > 0.0) {
                         output_layer[o_idx] = sum;
                     }
@@ -287,9 +316,16 @@ __v64d *softmax_layer(__v64d *hidden_layer) {
             }
         }
     }
+    if (VSIZE/(training_features/2) > 1) {
+        for (i = 0; i < (VSIZE/(training_features/2)); ++i) {
+            free(mask[i]);
+        }
+        free(mask);
+    }
     free(f_output);
     free(partial_sum);
     free(partial_mul);
+    free(partial_acc);
     return output_layer;
 }
 
@@ -330,19 +366,46 @@ void normalization(__v64d *output_layer) {
 }
 
 int main(int argc, char const *argv[]) {
-    clock_t begin = clock();
+    total_begin = clock();
     base_type train_base;
+
+    read_begin = clock();
     read_file(argv, &train_base);
     output_size = atoi(argv[3]);
+    read_end = clock();
+    read_spent = (double)(read_end - read_begin) / CLOCKS_PER_SEC;
 
+    hidden_begin = clock();
     __v64d *hidden_layer = relu_layer(&train_base);
-    __v64d *output_layer = softmax_layer(hidden_layer);
-    normalization(output_layer);
-    classification(output_layer);
+    hidden_end = clock();
+    hidden_spent = (double)(hidden_end - hidden_begin) / CLOCKS_PER_SEC;
 
-    clock_t end = clock();
-    double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    printf("Execution time: %lf\n\n\n\n", time_spent);
+    output_begin = clock();
+    __v64d *output_layer = softmax_layer(hidden_layer);
+    output_end = clock();
+    output_spent = (double)(output_end - output_begin) / CLOCKS_PER_SEC;
+
+    norm_begin = clock();
+    normalization(output_layer);
+    norm_end = clock();
+    norm_spent = (double)(norm_end - norm_begin) / CLOCKS_PER_SEC;
+
+    class_begin = clock();
+    classification(output_layer);
+    class_end = clock();
+    class_spent = (double)(class_end - class_begin) / CLOCKS_PER_SEC;
+
+    total_end = clock();
+    total_spent = (double)(total_end - total_begin) / CLOCKS_PER_SEC;
+    printf("*************************************\n");
+    printf("* Execution time:         %lfs *\n", total_spent);
+    printf(" ***********************************\n");
+    printf("* Read time:              %lfs *\n", read_spent);
+    printf("* Input x Hidden layer:   %lfs *\n", hidden_spent);
+    printf("* Hidden x Output layer:  %lfs *\n", output_spent);
+    printf("* Normalization:          %lfs *\n", norm_spent);
+    printf("* Classification time:    %lfs *\n", class_spent);
+    printf("*************************************\n");
     free(train_base.base);
     free(train_base.label);
     free(hidden_layer);
