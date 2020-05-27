@@ -160,6 +160,7 @@ void classification(char const *argv[], base_type *train_base) {
                     e_distance[0][ed_idx++] = sqrt(sum);
                 }
                 ed_end = clock();
+                ed_spent += (double)(ed_end - ed_begin) / CLOCKS_PER_SEC;
             } else {
                 ed_begin = clock();
                 for (jj = j, ii = 0; jj < j + (v_tesize * VSIZE) && ii < (v_tesize * VSIZE); jj += VSIZE, ii += VSIZE) {
