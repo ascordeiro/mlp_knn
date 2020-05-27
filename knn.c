@@ -123,10 +123,7 @@ void classification(char const *argv[], base_type *train_base) {
     }
     __v64d *partial_sub = (__v64d *)malloc(sizeof(__v64d) * v_tesize * VSIZE);
     __v64d *partial_mul = (__v64d *)malloc(sizeof(__v64d) * v_tesize * VSIZE);
-    __v64d *copy_mul = (__v64d *)malloc(sizeof(__v64d) * v_tesize * VSIZE);
-    __v64d *partial_and = (__v64d *)malloc(sizeof(__v64d) * VSIZE);
     __v64d *partial_acc = (__v64d *)malloc(sizeof(__v64d) * VSIZE);
-    __v64d *vand = (__v64d *)malloc(sizeof(__v64d) * VSIZE);
     __v64d **mask;
     if (test_features < VSIZE) {
         mask = create_mask(n_instances);
@@ -163,7 +160,6 @@ void classification(char const *argv[], base_type *train_base) {
                     e_distance[0][ed_idx++] = sqrt(sum);
                 }
                 ed_end = clock();
-                ed_spent += (double)(ed_end - ed_begin) / CLOCKS_PER_SEC;
             } else {
                 ed_begin = clock();
                 for (jj = j, ii = 0; jj < j + (v_tesize * VSIZE) && ii < (v_tesize * VSIZE); jj += VSIZE, ii += VSIZE) {
@@ -214,9 +210,6 @@ void classification(char const *argv[], base_type *train_base) {
     free(e_distance);
     free(partial_sub);
     free(partial_mul);
-    free(partial_and);
-    free(copy_mul);
-    free(vand);
     free(test_base.base);
     free(test_base.label);
 }

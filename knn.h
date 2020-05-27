@@ -4,7 +4,7 @@
 #include <math.h>
 #include <limits.h>
 #include <time.h>
-#include "../../intrinsics/vima/vima.hpp"
+#include "../intrinsics/vima/vima.hpp"
 
 typedef struct base_type {
     __v64d *base;
