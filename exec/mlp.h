@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include "../../intrinsics_update/vima/vima.hpp"
+#include <immintrin.h>
 
 typedef struct base_type {
     __v32f *base;

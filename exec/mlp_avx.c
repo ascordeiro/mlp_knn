@@ -11,11 +11,6 @@ void read_file(char const *argv[], base_type *train_base) {
 
     training_instances = atoi(argv[2]);
     training_features = atoi(argv[3]);
-    printf("instances %d features %d\n", training_instances, training_features);
-    // FILE *f = fopen(argv[2], "r");
-    // if (fscanf(f, "%d", &training_instances));
-    // if (fscanf(f, "%d\n", &training_features));
-    // fclose(f);
 
     n_vectors = training_features/VSIZE;
     n_instances = 1;
@@ -30,8 +25,10 @@ void read_file(char const *argv[], base_type *train_base) {
         base_size = training_instances * n_vectors * VSIZE;
     }
 
-    train_base->base = (__v32f *)calloc(base_size, sizeof(__v32f));
-    train_base->label = (__v32u *)calloc(training_instances, sizeof(__v32u));
+    train_base->base = (__v32f *)aligned_alloc(32, sizeof(__v32f)*base_size);
+    train_base->label = (__v32u *)aligned_alloc(32, sizeof(__v32u)*training_instances);
+    // train_base->base = (__v32f *)calloc(base_size, sizeof(__v32f));
+    // train_base->label = (__v32u *)calloc(training_instances, sizeof(__v32u));
 }
 
 __v32f *relu_layer(base_type *train_base) {
@@ -44,11 +41,16 @@ __v32f *relu_layer(base_type *train_base) {
     if (hidden_size < VSIZE) {
         hidden_size = VSIZE;
     }
-    __v32f *f_weights = (__v32f *)calloc(fw_size * VSIZE, sizeof(__v32f));
-    __v32f *partial_mul = (__v32f *)malloc(sizeof(__v32f) * fw_size * n_vectors * VSIZE);
-    __v32f *partial_sum = (__v32f *)malloc(sizeof(__v32f) * fw_size * n_vectors * VSIZE);
-    __v32f *partial_acc = (__v32f *)malloc(sizeof(__v32f) * VSIZE);
-    __v32f *hidden_layer = (__v32f *)calloc(hidden_size, sizeof(__v32f));
+    __v32f *f_weights = (__v32f *)aligned_alloc(32, fw_size * VSIZE * sizeof(__v32f));
+    __v32f *partial_mul = (__v32f *)aligned_alloc(32, sizeof(__v32f) * fw_size * n_vectors * VSIZE);
+    __v32f *partial_sum = (__v32f *)aligned_alloc(32, sizeof(__v32f) * fw_size * n_vectors * VSIZE);
+    __v32f *partial_acc = (__v32f *)aligned_alloc(32, sizeof(__v32f) * VSIZE);
+    __v32f *hidden_layer = (__v32f *)aligned_alloc(32, hidden_size * sizeof(__v32f));
+    // __v32f *f_weights = (__v32f *)calloc(fw_size * VSIZE, sizeof(__v32f));
+    // __v32f *partial_mul = (__v32f *)malloc(sizeof(__v32f) * fw_size * n_vectors * VSIZE);
+    // __v32f *partial_sum = (__v32f *)malloc(sizeof(__v32f) * fw_size * n_vectors * VSIZE);
+    // __v32f *partial_acc = (__v32f *)malloc(sizeof(__v32f) * VSIZE);
+    // __v32f *hidden_layer = (__v32f *)calloc(hidden_size, sizeof(__v32f));
     __v32f sum, p_sum;
 
     int m_size;
@@ -58,12 +60,19 @@ __v32f *relu_layer(base_type *train_base) {
     else {
         m_size = (VSIZE/(training_features * (training_features/2))) * training_features/2;
     }
-    __v32f **mask = (__v32f **)calloc(m_size, sizeof(__v32f *));
+    // __v32f **mask = (__v32f **)calloc(m_size, sizeof(__v32f *));
+    // for (i = 0; i < m_size; ++i) {
+    //     mask[i] = (__v32f *)calloc(VSIZE, sizeof(__v32f));
+    // }
+    __v32f **mask = (__v32f **)aligned_alloc(32, m_size * sizeof(__v32f *));
     for (i = 0; i < m_size; ++i) {
-        mask[i] = (__v32f *)calloc(VSIZE, sizeof(__v32f));
+        mask[i] = (__v32f *)aligned_alloc(32, VSIZE * sizeof(__v32f));
     }
-
-    bias = (__v32f *)calloc(VSIZE, sizeof(__v32f));
+    
+    bias = (__v32f *)aligned_alloc(32, VSIZE * sizeof(__v32f));
+    // bias = (__v32f *)calloc(VSIZE, sizeof(__v32f));
+    __m256 avx_base, avx_weights, avx_bias, avx_pmul, avx_psum;
+    // avx_bias = _mm256_broadcastss_ps(1.0);
     if (vector_size == 256) {
         for (i = 0; i < base_size; i += VSIZE * n_vectors) {
             for (j = 0; j < fw_size; ++j) {
@@ -156,18 +165,27 @@ __v32f *softmax_layer(__v32f *hidden_layer) {
         olayer_size = VSIZE;
     }
 
-    __v32f *output_layer = (__v32f *)calloc(olayer_size, sizeof(__v32f));
-    __v32f *f_output = (__v32f *)calloc(VSIZE * output_size, sizeof(__v32f));
-    __v32f *partial_mul = (__v32f *)malloc(sizeof(__v32f) * VSIZE * out_inst_size * output_size);
-    __v32f *partial_sum = (__v32f *)malloc(sizeof(__v32f) * VSIZE * out_inst_size * output_size);
-    __v32f *partial_acc = (__v32f *)malloc(sizeof(__v32f) * VSIZE);
+    __v32f *output_layer = (__v32f *)aligned_alloc(32, olayer_size * sizeof(__v32f));
+    __v32f *f_output = (__v32f *)aligned_alloc(32, VSIZE * output_size * sizeof(__v32f));
+    __v32f *partial_mul = (__v32f *)aligned_alloc(32, sizeof(__v32f) * VSIZE * out_inst_size * output_size);
+    __v32f *partial_sum = (__v32f *)aligned_alloc(32, sizeof(__v32f) * VSIZE * out_inst_size * output_size);
+    __v32f *partial_acc = (__v32f *)aligned_alloc(32, sizeof(__v32f) * VSIZE);
+    // __v32f *output_layer = (__v32f *)calloc(olayer_size, sizeof(__v32f));
+    // __v32f *f_output = (__v32f *)calloc(VSIZE * output_size, sizeof(__v32f));
+    // __v32f *partial_mul = (__v32f *)malloc(sizeof(__v32f) * VSIZE * out_inst_size * output_size);
+    // __v32f *partial_sum = (__v32f *)malloc(sizeof(__v32f) * VSIZE * out_inst_size * output_size);
+    // __v32f *partial_acc = (__v32f *)malloc(sizeof(__v32f) * VSIZE);
 
     __v32f **mask;
     if (VSIZE/(training_features/2) > 1) {
-        mask = (__v32f **)calloc(VSIZE/(training_features/2), sizeof(__v32f *));
+        mask = (__v32f **)aligned_alloc(32, VSIZE/(training_features/2) * sizeof(__v32f *));
         for (int i = 0; i < VSIZE/(training_features/2); ++i) {
-            mask[i] = (__v32f *)calloc(VSIZE, sizeof(__v32f));
+            mask[i] = (__v32f *)aligned_alloc(32, VSIZE * sizeof(__v32f));
         }
+        // mask = (__v32f **)calloc(VSIZE/(training_features/2), sizeof(__v32f *));
+        // for (int i = 0; i < VSIZE/(training_features/2); ++i) {
+        //     mask[i] = (__v32f *)calloc(VSIZE, sizeof(__v32f));
+        // }
     }
 
     if (vector_size == 256) {
@@ -254,7 +272,8 @@ __v32f *softmax_layer(__v32f *hidden_layer) {
 
 void classification(__v32f *output_layer) {
     __v32f sum_exp;
-    __v32f *result = (__v32f *)malloc(sizeof(__v32f) * output_size);
+    __v32f *result = (__v32f *)aligned_alloc(32, sizeof(__v32f) * output_size);
+    // __v32f *result = (__v32f *)malloc(sizeof(__v32f) * output_size);
     for (int i = 0; i < training_instances; ++i) {
         sum_exp = 0.0;
         for (int j = 0; j < output_size; ++j) {
@@ -273,13 +292,17 @@ void classification(__v32f *output_layer) {
 }
 
 __v32f *normalization(__v32f *layer, int size) {
-    __v32f *broad_minmax = (__v32f *)malloc(sizeof(__v32f) * VSIZE);
-    __v32f *broad_min = (__v32f *)malloc(sizeof(__v32f) * VSIZE);
-    __v32f *partial_sub = (__v32f *)malloc(sizeof(__v32f) * VSIZE);
+    // __v32f *broad_minmax = (__v32f *)malloc(sizeof(__v32f) * VSIZE);
+    // __v32f *broad_min = (__v32f *)malloc(sizeof(__v32f) * VSIZE);
+    // __v32f *partial_sub = (__v32f *)malloc(sizeof(__v32f) * VSIZE);
+    __v32f *broad_minmax = (__v32f *)aligned_alloc(32, sizeof(__v32f) * VSIZE);
+    __v32f *broad_min = (__v32f *)aligned_alloc(32, sizeof(__v32f) * VSIZE);
+    __v32f *partial_sub = (__v32f *)aligned_alloc(32, sizeof(__v32f) * VSIZE);
     if (size < VSIZE) {
         size = VSIZE;
     }
-    __v32f *norm = (__v32f *)malloc(sizeof(__v32f) * size);
+    __v32f *norm = (__v32f *)aligned_alloc(32, sizeof(__v32f) * size);
+    // __v32f *norm = (__v32f *)malloc(sizeof(__v32f) * size);
 
     __v32f min = layer[0];
     __v32f max = layer[0];
