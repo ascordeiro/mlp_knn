@@ -7,11 +7,14 @@ void init_vec(char const *argv[]) {
     base_size = training_features * training_instances;
 
     base = (float *)aligned_alloc(64, sizeof(float)*base_size);
-    label = (__uint32_t *)aligned_alloc(32, sizeof(__uint32_t)*training_instances);
-    
-    __m512 base_avx = _mm512_load_ps(&base);
-    _mm512_store_ps(&base, base_avx);
+    label = (__uint32_t *)aligned_alloc(64, sizeof(__uint32_t)*training_instances);
 
+    __m512 avx_base;
+    for(int i = 0; i < base_size; i += AVX_SIZE) {
+	avx_base = _mm512_load_ps(&base[i]);
+	avx_base = _mm512_set1_ps((float)1.0);
+	_mm512_store_ps(&base[i], avx_base);
+    }
 }
 
 float *relu_layer() {
@@ -24,16 +27,22 @@ float *relu_layer() {
 
     __m512 avx_base, avx_weights, avx_bias, avx_pmul, avx_psum, avx_phidden;
     __mmask16 avx_mask[2] = {0xff00, 0xff};
-    float *h_weights = (float *)aligned_alloc(32, w_size * sizeof(float));
-    float *hidden_layer = (float *)aligned_alloc(32, hidden_size * sizeof(float));
+    avx_bias = _mm512_set1_ps((float)1.0);
+    float *h_weights = (float *)aligned_alloc(64, w_size * sizeof(float));
+    float *hidden_layer = (float *)aligned_alloc(64, hidden_size * sizeof(float));
     float sum;
+
+    for (i = 0; i < w_size; i += AVX_SIZE) {
+	avx_weights = _mm512_load_ps(&h_weights[i]);
+	avx_weights = _mm512_set1_ps((float)0.5);
+	_mm512_store_ps(&h_weights[i], avx_weights);
+    }
 
     if (training_features < AVX_SIZE) {
         for (i = 0; i < base_size; i += training_features) {
             avx_base = _mm512_setr_ps(base[i], base[i+1], base[i+2], base[i+3], base[i+4], base[i+5], base[i+6], base[i+7], 
                                       base[i], base[i+1], base[i+2], base[i+3], base[i+4], base[i+5], base[i+6], base[i+7]);
             for (j = i * hlayer_size; j < i * hlayer_size + (training_features * hlayer_size); j += AVX_SIZE) {
-                avx_weights = _mm512_load_ps(&h_weights[j]);
                 avx_pmul = _mm512_mul_ps(avx_base, avx_weights);
                 for (k = 0; k < 2; k++) {
                     hidden_layer[h_idx++] = _mm512_mask_reduce_add_ps(avx_mask[k], avx_pmul);
@@ -45,11 +54,8 @@ float *relu_layer() {
             for (j = i * hlayer_size; j < i * hlayer_size + (training_features * hlayer_size); j += training_features) {
                 sum = 0.0;
                 for (k = 0; k < n_vectors; k++) {
-//		    printf("base: %d - peso: %d\n", i+k*AVX_SIZE, j+k*AVX_SIZE);
                     avx_base = _mm512_load_ps(&base[i + k * AVX_SIZE]);
-		    avx_base = _mm512_set1_ps((float)1.0);
                     avx_weights = _mm512_load_ps(&h_weights[j + k * AVX_SIZE]);
-		    avx_weights = _mm512_set1_ps((float)1.0);
                     avx_pmul = _mm512_mul_ps(avx_base, avx_weights);
                     sum += _mm512_reduce_add_ps(avx_pmul);
                 }
@@ -61,13 +67,13 @@ float *relu_layer() {
     for (i = 0; i < hidden_size; i += AVX_SIZE) {
         avx_phidden = _mm512_load_ps(&hidden_layer[i]);
         avx_psum = _mm512_add_ps(avx_phidden, avx_bias);
-	for (j = 0; j < AVX_SIZE; j++) {
-		hidden_layer[h_idx] = avx_psum[j];
-		if (hidden_layer[h_idx] < 0.0) {
-			hidden_layer[h_idx] = 0.0;
-		}
-		h_idx++;
+	_mm512_store_ps(&hidden_layer[i], avx_psum);
+	for (j = i; j < AVX_SIZE; j++) {
+	    if (hidden_layer[j] < 0.0) {
+		hidden_layer[j] = 0.0;
+	    }
 	}
+	h_idx += AVX_SIZE;
     }
 
     free(h_weights);
@@ -80,12 +86,19 @@ float *softmax_layer(float *hidden_layer) {
     int olayer_size = output_size * training_instances, hlayer_size = training_features/2;
     int oweights_size = training_features * training_instances;
     int n_vectors = hlayer_size/AVX_SIZE;
-    float *output_layer = (float *)aligned_alloc(32, olayer_size * sizeof(float));
-    float *o_weights = (float *)aligned_alloc(32, oweights_size * sizeof(float));
+    float *output_layer = (float *)aligned_alloc(64, olayer_size * sizeof(float));
+    float *o_weights = (float *)aligned_alloc(64, oweights_size * sizeof(float));
 
-    __m512 avx_pmul, avx_psum, avx_hidden, avx_oweights, avx_output, bias;
+    __m512 avx_pmul, avx_psum, avx_hidden, avx_oweights, avx_output, avx_bias;
     __mmask16 avx_mask8[4] = {0xf000, 0xf00, 0xf0, 0xf};
     __mmask16 avx_mask16[2] = {0xff00, 0xff};
+    avx_bias = _mm512_set1_ps((float)1.0);
+
+    for (i = 0; i < oweights_size; i += AVX_SIZE) {
+        avx_oweights = _mm512_load_ps(&o_weights[i]);
+        avx_oweights = _mm512_set1_ps((float)0.5);
+        _mm512_store_ps(&o_weights[i], avx_oweights);
+    }
 
     if (training_features == 8) {
         for (i = 0; i < hidden_size; i += training_features) {
@@ -122,9 +135,7 @@ float *softmax_layer(float *hidden_layer) {
                 sum = 0.0;
                 for (k = 0; k < n_vectors; k++) {
                     avx_hidden = _mm512_load_ps(&hidden_layer[i + k * AVX_SIZE]);
-		    avx_hidden = _mm512_set1_ps((float)1.0);
                     avx_oweights = _mm512_load_ps(&o_weights[j + k * AVX_SIZE]);
-		    avx_oweights = _mm512_set1_ps((float)1.0);
                     avx_pmul = _mm512_mul_ps(avx_hidden, avx_oweights);
                     sum += _mm512_reduce_add_ps(avx_pmul);
                 }
@@ -135,14 +146,14 @@ float *softmax_layer(float *hidden_layer) {
     o_idx = 0;
     for (i = 0; i < olayer_size; i += AVX_SIZE) {
         avx_output = _mm512_load_ps(&output_layer[i]);
-        avx_psum = _mm512_add_ps(avx_output, bias);
-        for (j = 0; j < AVX_SIZE; j++) {
-		output_layer[o_idx] = avx_psum[j];
-		if (output_layer[o_idx] < 0.0) {
-			output_layer[o_idx] = 0.0;
-		}
-		o_idx++;
+        avx_psum = _mm512_add_ps(avx_output, avx_bias);
+        _mm512_store_ps(&output_layer[i], avx_psum);
+	for (j = i; j < AVX_SIZE; j++) {
+	    if (output_layer[j] < 0.0) {
+		output_layer[j] = 0.0;
+	    }
 	}
+	o_idx += AVX_SIZE;
     }
 
     free(o_weights);
@@ -150,32 +161,37 @@ float *softmax_layer(float *hidden_layer) {
 }
 
 void classification(float *output_layer) {
-    float *sum_exp = (float *)aligned_alloc(32, sizeof(float) * training_instances);
-    float *result = (float *)aligned_alloc(32, sizeof(float) * output_size);
+    float *sum_exp = (float *)aligned_alloc(64, sizeof(float) * training_instances);
+    float *result = (float *)aligned_alloc(64, sizeof(float) * training_instances * output_size);
 
-    for (int i = 0; i < training_instances; ++i) {
-        sum_exp[i] = 0.0;
+    __m512 avx_sumexp, avx_output, avx_div;
+    for (int i = 0; i < training_instances; i += AVX_SIZE) {
+	avx_sumexp = _mm512_load_ps(&sum_exp[i]);
+        avx_sumexp = _mm512_setzero_ps();
+	_mm512_store_ps(&sum_exp[i], avx_sumexp);
+    }
+
+    for (int i = 0; i < training_instances; i++) {
         for (int j = 0; j < output_size; ++j) {
             sum_exp[i] += exp(output_layer[i * output_size + j]);
         }
     }
 
-    __m512 avx_sumexp, avx_output, avx_div;
     for (int i = 0, j = 0; i < training_instances; i += AVX_SIZE/2, j += AVX_SIZE) {
         avx_sumexp = _mm512_setr_ps(sum_exp[i], sum_exp[i], sum_exp[i+1], sum_exp[i+1], sum_exp[i+2], sum_exp[i+2], 
                                     sum_exp[i+3], sum_exp[i+3], sum_exp[i+4], sum_exp[i+4], sum_exp[i+5], sum_exp[i+5], 
                                     sum_exp[i+6], sum_exp[i+6], sum_exp[i+7], sum_exp[i+7]);
-	avx_sumexp = _mm512_set1_ps((float)1.0);
         avx_output = _mm512_load_ps(&output_layer[j]);
-	avx_output = _mm512_set1_ps((float)1.0);
         avx_div = _mm512_div_ps(avx_output, avx_sumexp);
-        for (int j = 0; j < AVX_SIZE; j += output_size) {
-            if (avx_div[j] > avx_div[j+1]) {
-                printf("%d. %s\n", j, "neg");
-            } else {
-                printf("%d. %s\n", i, "pos");
-            }
-        }
+	_mm512_store_ps(&result[j], avx_div);
+    }
+
+    for (int i = 0, j = 0; j < training_instances * output_size; i++, j += output_size) {
+	if (result[j] > result[j+1]) {
+	    printf("%d. %s\n", i, "neg");
+	} else {
+	    printf("%d. %s\n", i, "pos");
+ 	}
     }
 
     free(result);
