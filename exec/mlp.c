@@ -35,10 +35,9 @@ void read_file(char const *argv[]) {
             _vim2K_fmovs(1, &base[i]);
         }
     }
-
 }
 
-inline void *initialize_weights(__v32f *weights, int size) {
+inline void initialize_weights(__v32f *weights, int size) {
     if (vector_size == 256) {
         for (int i = 0; i < size; i += VSIZE) {
             _vim64_fmovs(0.5, &weights[i]);
@@ -67,7 +66,7 @@ __v32f *relu_layer() {
     int i, j, k, h_idx = 0;
 
     int weight_size, mask_size;
-     __v32f **mask;
+    __v32f **mask;
 
     if (inst_in_vec > 1) {
         weight_size = VSIZE;
@@ -93,7 +92,7 @@ __v32f *relu_layer() {
 
     bias = (__v32f *)malloc(sizeof(__v32f) * VSIZE);
     if (vector_size == 256) {
-        _vim64_fmovs(1, &bias[i]);
+        _vim64_fmovs(1, bias);
         if (inst_in_vec > 1) {
             for (i = 0; i < base_size; i += VSIZE) {
                 _vim64_fmuls(&base[i], weights, partial_mul);
@@ -140,7 +139,7 @@ __v32f *relu_layer() {
             }
         }
     } else {
-        _vim2K_fmovs(1, &bias[i]);
+        _vim2K_fmovs(1, bias);
         if (inst_in_vec > 1) {
             for (i = 0; i < base_size; i += VSIZE) {
                 _vim2K_fmuls(&base[i], weights, partial_mul);
@@ -211,7 +210,7 @@ __v32f *relu_layer() {
 }
 
 __v32f *softmax_layer(__v32f *hidden_layer) {
-    int i, j, k, o_idx = 0;
+    int i, j, o_idx = 0;
     __v32f sum, p_sum;
 
     __v32f *weights = (__v32f *)malloc(sizeof(__v32f) * hidden_size);
@@ -306,6 +305,7 @@ __v32f *softmax_layer(__v32f *hidden_layer) {
 void classification(__v32f *output_layer) {
     __v32f sum_exp;
     __v32f *result = (__v32f *)malloc(sizeof(__v32f) * output_size);
+
     for (int i = 0; i < training_instances; ++i) {
         sum_exp = 0.0;
         for (int j = 0; j < output_size; ++j) {
