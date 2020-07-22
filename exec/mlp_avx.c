@@ -6,8 +6,12 @@ void init_vec(char const *argv[]) {
 
     base_size = training_features * training_instances;
 
-    base = (float *)aligned_alloc(32, sizeof(float)*base_size);
+    base = (float *)aligned_alloc(64, sizeof(float)*base_size);
     label = (__uint32_t *)aligned_alloc(32, sizeof(__uint32_t)*training_instances);
+    
+    __m512 base_avx = _mm512_load_ps(&base);
+    _mm512_store_ps(&base, base_avx);
+
 }
 
 float *relu_layer() {
