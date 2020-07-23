@@ -226,8 +226,8 @@ __v32f *softmax_layer(__v32f *hidden_layer) {
     if (o_size < VSIZE) {
         o_size = VSIZE;
     }
-    __v32f *output_layer = (__v32f *)malloc(sizeof(__v32f) * training_instances * o_size);
-    __v32f *p_olayer = (__v32f *)calloc(training_instances * o_size, sizeof(__v32f));
+    __v32f *output_layer = (__v32f *)malloc(sizeof(__v32f) * o_size);
+    __v32f *p_olayer = (__v32f *)calloc(o_size, sizeof(__v32f));
     __v32f *partial_mul = (__v32f *)malloc(sizeof(__v32f) * VSIZE);
     __v32f *partial_acc = (__v32f *)malloc(sizeof(__v32f) * VSIZE);
 
