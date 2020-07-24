@@ -86,17 +86,16 @@ void classification(char const *argv[]) {
         // for each test instance
         for (i = 0; i < training_instances; i++) {
             read_test_instance(te_base, te_base_size);
-            for (j = 0; j < training_features; j += training_features) {
-                avx_tebase = _mm512_setr_ps(te_base[j], te_base[j+1], te_base[j+2], te_base[j+3], te_base[j+4], te_base[j+5], te_base[j+6], te_base[j+7], 
-                                            te_base[j], te_base[j+1], te_base[j+2], te_base[j+3], te_base[j+4], te_base[j+5], te_base[j+6], te_base[j+7]);
-            }
+            avx_tebase = _mm512_setr_ps(te_base[0], te_base[1], te_base[2], te_base[3], te_base[4], te_base[5], te_base[6], te_base[7],
+                                        te_base[0], te_base[1], te_base[2], te_base[3], te_base[4], te_base[5], te_base[6], te_base[7]);
 
             for (j = 0; j < base_size; j += AVX_SIZE) {
                 avx_trbase = _mm512_load_ps(&tr_base[j]);
                 avx_psub = _mm512_sub_ps(avx_trbase, avx_tebase);
                 avx_pmul = _mm512_mul_ps(avx_psub, avx_psub);
                 for (k = 0; k < masks; k += AVX_SIZE) {
-                    e_distance[ed_idx++] = _mm512_mask_reduce_add_ps(avx_mask[k], avx_pmul);
+//			printf("test: %d - training: %d - mask: %d\n", i, j, k);
+                    e_distance[ed_idx] = _mm512_mask_reduce_add_ps(avx_mask[k], avx_pmul);
                 }
             }
         }
@@ -120,7 +119,6 @@ void classification(char const *argv[]) {
     u_int32_t *knn = (u_int32_t *)calloc(k_neighbors, sizeof(u_int32_t));
     class_begin = clock();
     get_ksmallest(e_distance, tr_label, knn, k_neighbors);
-    printf("%u. ", ed_idx++);
     votes(knn, k_neighbors);
     class_end = clock();
     class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
