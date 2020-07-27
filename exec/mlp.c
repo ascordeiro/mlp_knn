@@ -314,11 +314,11 @@ void classification(__v32f *output_layer) {
         for (int j = 0; j < output_size; ++j) {
             result[j] = exp(output_layer[i * output_size + j]) / sum_exp;
         }
-        if (result[0] > result[1]) {
-            printf("%d. %s\n", i, "neg");
-        } else {
-            printf("%d. %s\n", i, "pos");
-        }
+        // if (result[0] > result[1]) {
+        //     printf("%d. %s\n", i, "neg");
+        // } else {
+        //     printf("%d. %s\n", i, "pos");
+        // }
     }
     free(result);
 }

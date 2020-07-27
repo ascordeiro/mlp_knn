@@ -31,11 +31,11 @@ void votes(u_int32_t *knn, int k) {
             neg++;
         }
     }
-    if (pos > neg) {
-        printf("%s\n", "pos");
-    } else {
-        printf("%s\n", "neg");
-    }
+    // if (pos > neg) {
+    //     printf("%s\n", "pos");
+    // } else {
+    //     printf("%s\n", "neg");
+    // }
 }
 
 void get_ksmallest(float *array, u_int32_t *label, u_int32_t *knn, int k) {
@@ -86,7 +86,7 @@ void classification(char const *argv[]) {
         // for each test instance
         for (i = 0; i < training_instances; i++) {
             ed_idx = 0;
-            read_test_instance(te_base, te_base_size);
+            // read_test_instance(te_base, te_base_size);
             avx_tebase = _mm512_setr_ps(te_base[0], te_base[1], te_base[2], te_base[3], te_base[4], te_base[5], te_base[6], te_base[7],
                                         te_base[0], te_base[1], te_base[2], te_base[3], te_base[4], te_base[5], te_base[6], te_base[7]);
 
@@ -100,7 +100,7 @@ void classification(char const *argv[]) {
             }
             class_begin = clock();
             get_ksmallest(e_distance, tr_label, knn, k_neighbors);
-            printf("%d. ", i);
+            // printf("%d. ", i);
             votes(knn, k_neighbors);
             class_end = clock();
             class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
@@ -109,7 +109,7 @@ void classification(char const *argv[]) {
         int n_vector = training_features/AVX_SIZE;
         for (i = 0; i < training_instances; i++) {
             ed_idx = 0;
-            read_test_instance(te_base, te_base_size);
+            // read_test_instance(te_base, te_base_size);
             for (j = 0; j < base_size; j += training_features) {
                 for (k = 0; k < n_vector; k++) {
                     avx_trbase = _mm512_load_ps(&tr_base[j + k * AVX_SIZE]);
@@ -122,14 +122,14 @@ void classification(char const *argv[]) {
             }
             class_begin = clock();
             get_ksmallest(e_distance, tr_label, knn, k_neighbors);
-            printf("%d. ", i);
+            // printf("%d. ", i);
             votes(knn, k_neighbors);
             class_end = clock();
             class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
         }
     }
     ed_end = clock();
-    ed_spent += (double)(ed_end - ed_begin) / CLOCKS_PER_SEC;
+    ed_spent += (double)(ed_end - ed_begin - class_spent) / CLOCKS_PER_SEC;
     
     free(knn);
     free(e_distance);

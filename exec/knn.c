@@ -47,11 +47,11 @@ void votes(__v32u *knn, int k) {
             neg++;
         }
     }
-    if (pos > neg) {
-        printf("%s\n", "pos");
-    } else {
-        printf("%s\n", "neg");
-    }
+    // if (pos > neg) {
+    //     printf("%s\n", "pos");
+    // } else {
+    //     printf("%s\n", "neg");
+    // }
 }
 
 void get_ksmallest(__v32f *array, __v32u *label, __v32u *knn, int k) {
@@ -103,6 +103,7 @@ void classification(char const *argv[]) {
     for (i = 0; i < n_instances; ++i) {
         e_distance[i] = (__v32f *)calloc(training_instances, sizeof(__v32f));
     }
+    __v32u *knn = (__v32u *)calloc(k, sizeof(__v32u));
     __v32f *partial_sub = (__v32f *)malloc(sizeof(__v32f) * v_tesize * VSIZE);
     __v32f *partial_mul = (__v32f *)malloc(sizeof(__v32f) * v_tesize * VSIZE);
     __v32f *partial_acc = (__v32f *)malloc(sizeof(__v32f) * VSIZE);
@@ -116,7 +117,7 @@ void classification(char const *argv[]) {
 
     for (i = 0; i < training_instances; i += n_instances) {
         ed_idx = 0;
-        read_test_instance(te_base, v_tesize * VSIZE);
+        // read_test_instance(te_base, v_tesize * VSIZE);
         for (j = 0; j < training_instances * VSIZE * v_tesize; j += v_tesize * VSIZE) {
             sum = 0.0;
             if (vector_size == 256) {
@@ -166,18 +167,17 @@ void classification(char const *argv[]) {
                 ed_spent += (double)(ed_end - ed_begin) / CLOCKS_PER_SEC;
             }
         }
-        __v32u *knn = (__v32u *)calloc(k, sizeof(__v32u));
         class_begin = clock();
         for (j = 0, jj = i; j < n_instances && jj < i + n_instances; ++j, ++jj) {
             get_ksmallest(e_distance[j], tr_label, knn, k);
-            printf("%u. ", jj);
+            // printf("%u. ", jj);
             votes(knn, k);
         }
         class_end = clock();
         class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
 
-        free(knn);
     }
+    free(knn);
     for (i = 0; i < n_instances; i++) {
         free(e_distance[i]);
     }

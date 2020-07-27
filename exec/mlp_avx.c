@@ -191,13 +191,13 @@ void classification(float *output_layer) {
 	    _mm512_store_ps(&result[j], avx_div);
     }
 
-    for (int i = 0, j = 0; j < training_instances * output_size; i++, j += output_size) {
-        if (result[j] > result[j+1]) {
-            printf("%d. %s\n", i, "neg");
-        } else {
-            printf("%d. %s\n", i, "pos");
-        }
-    }
+    // for (int i = 0, j = 0; j < training_instances * output_size; i++, j += output_size) {
+    //     if (result[j] > result[j+1]) {
+    //         printf("%d. %s\n", i, "neg");
+    //     } else {
+    //         printf("%d. %s\n", i, "pos");
+    //     }
+    // }
 
     free(result);
 }
