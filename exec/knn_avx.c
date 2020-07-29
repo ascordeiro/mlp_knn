@@ -86,6 +86,7 @@ void classification(char const *argv[]) {
         __mmask16 avx_mask[2] = {0xff00, 0xff};
         // for each test instance
         for (i = 0; i < test_instances; i++) {
+            inst_begin = clock();
             ed_idx = 0;
             read_test_instance(te_base, te_base_size);
             avx_tebase = _mm512_setr_ps(te_base[0], te_base[1], te_base[2], te_base[3], te_base[4], te_base[5], te_base[6], te_base[7],
@@ -105,10 +106,13 @@ void classification(char const *argv[]) {
             votes(knn, k_neighbors);
             class_end = clock();
             class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
+            inst_end = clock();
+            printf("tempo: %f\n", (double)(inst_end - inst_begin)/CLOCKS_PER_SEC);
         }
     } else {
         int n_vector = training_features/AVX_SIZE;
         for (i = 0; i < test_instances; i++) {
+            inst_begin = clock();
             ed_idx = 0;
             read_test_instance(te_base, te_base_size);
             for (j = 0; j < base_size; j += training_features) {
@@ -127,6 +131,8 @@ void classification(char const *argv[]) {
             votes(knn, k_neighbors);
             class_end = clock();
             class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
+            inst_end = clock();
+            printf("tempo: %f\n", (double)(inst_end - inst_begin)/CLOCKS_PER_SEC);
         }
     }
     ed_end = clock();
