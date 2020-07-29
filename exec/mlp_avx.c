@@ -4,17 +4,17 @@ void init_vec(char const *argv[]) {
     training_instances = atoi(argv[1]);
     training_features = atoi(argv[2]);
 
-    base_size = training_features * training_instances;
+    // base_size = training_features * training_instances;
 
-    base = (float *)aligned_alloc(64, sizeof(float)*base_size);
-    label = (__uint32_t *)aligned_alloc(64, sizeof(__uint32_t)*training_instances);
+    // base = (float *)aligned_alloc(64, sizeof(float)*base_size);
+    // label = (__uint32_t *)aligned_alloc(64, sizeof(__uint32_t)*training_instances);
 
-    __m512 avx_base;
-    for(int i = 0; i < base_size; i += AVX_SIZE) {
-	avx_base = _mm512_load_ps(&base[i]);
-	avx_base = _mm512_set1_ps((float)1.0);
-	_mm512_store_ps(&base[i], avx_base);
-    }
+    // __m512 avx_base;
+    // for(int i = 0; i < base_size; i += AVX_SIZE) {
+	// avx_base = _mm512_load_ps(&base[i]);
+	// avx_base = _mm512_set1_ps((float)1.0);
+	// _mm512_store_ps(&base[i], avx_base);
+    // }
 }
 
 void initialize_weights(float *weights, int size) {
@@ -23,6 +23,15 @@ void initialize_weights(float *weights, int size) {
         avx_weights = _mm512_load_ps(&weights[i]);
         avx_weights = _mm512_set1_ps((float)0.5);
 	    _mm512_store_ps(&weights[i], avx_weights);
+    }
+}
+
+void read_instance(float *instance, int size) {
+    __m512 avx_instance;
+    for (int i = 0; i < size; i += AVX_SIZE) {
+        avx_instance = _mm512_load_ps(&instance[i]);
+        avx_instance = _mm512_set1_ps((float)1.0);
+	    _mm512_store_ps(&instance[i], avx_instance);
     }
 }
 
@@ -37,6 +46,8 @@ float *relu_layer() {
     __m512 avx_base, avx_weights, avx_bias, avx_pmul, avx_psum, avx_phidden;
     __mmask16 avx_mask[2] = {0xff00, 0xff};
     avx_bias = _mm512_set1_ps((float)1.0);
+
+    float *instance = (float *)aligned_alloc(64, training_features * sizeof(float));
     float *h_weights = (float *)aligned_alloc(64, w_size * sizeof(float));
     float *hidden_layer = (float *)aligned_alloc(64, hidden_size * sizeof(float));
     float sum;
@@ -44,9 +55,10 @@ float *relu_layer() {
     initialize_weights(h_weights, w_size);
 
     if (training_features < AVX_SIZE) {
-        for (i = 0; i < base_size; i += training_features) {
-            avx_base = _mm512_setr_ps(base[i], base[i+1], base[i+2], base[i+3], base[i+4], base[i+5], base[i+6], base[i+7], 
-                                      base[i], base[i+1], base[i+2], base[i+3], base[i+4], base[i+5], base[i+6], base[i+7]);
+        for (i = 0; i < training_instances; i++) {
+            read_instance(instance, training_features);
+            avx_base = _mm512_setr_ps(instance[0], instance[1], instance[2], instance[3], instance[4], instance[5], instance[6], instance[7], 
+                                      instance[0], instance[1], instance[2], instance[3], instance[4], instance[5], instance[6], instance[7]);
             for (j = 0; j < w_size; j += AVX_SIZE) {
                 avx_weights = _mm512_load_ps(&h_weights[j]);
                 avx_pmul = _mm512_mul_ps(avx_base, avx_weights);
@@ -57,11 +69,12 @@ float *relu_layer() {
             initialize_weights(h_weights, w_size);
         }
     } else {
-        for (i = 0; i < base_size; i += training_features) {
+        for (i = 0; i < training_instances; i++) {
+            read_instance(instance, training_features);
             for (j = 0; j < w_size; j += training_features) {
                 sum = 0.0;
                 for (k = 0; k < n_vectors; k++) {
-                    avx_base = _mm512_load_ps(&base[i + k * AVX_SIZE]);
+                    avx_base = _mm512_load_ps(&instance[k * AVX_SIZE]);
                     avx_weights = _mm512_load_ps(&h_weights[j + k * AVX_SIZE]);
                     avx_pmul = _mm512_mul_ps(avx_base, avx_weights);
                     sum += _mm512_reduce_add_ps(avx_pmul);
@@ -84,6 +97,7 @@ float *relu_layer() {
 	    h_idx += AVX_SIZE;
     }
 
+    free(instance);
     free(h_weights);
     return hidden_layer;
 }
@@ -236,8 +250,8 @@ int main(int argc, char const *argv[]) {
     printf("* Hidden x Output layer:  %fs *\n", output_spent);
     printf("* Classification time:    %fs *\n", class_spent);
     printf("*************************************\n");
-    free(base);
-    free(label);
+    // free(base);
+    // free(label);
     free(hidden_layer);
     free(output_layer);
     free(bias);
