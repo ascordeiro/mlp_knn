@@ -1,42 +1,5 @@
 #include "mlp.h"
 
-
-void read_file(char const *argv[]) {
-    vector_size = atoi(argv[1]);
-    if (vector_size == 256) {
-        VSIZE = VM64I;
-    } else {
-        VSIZE = VM2KI;
-    }
-
-    training_instances = atoi(argv[2]);
-    training_features = atoi(argv[3]);
-
-    n_vectors = training_features/VSIZE;
-
-    inst_in_vec = VSIZE/(training_features*(training_features/2));
-    if (inst_in_vec > 1) {
-        base_size = training_instances/inst_in_vec * VSIZE;
-    } else if (VSIZE/training_features > 1) {
-        base_size = training_instances * VSIZE; 
-    } else {
-        base_size = training_instances * n_vectors * VSIZE;
-    }
-
-    base = (__v32f *)calloc(base_size, sizeof(__v32f));
-    label = (__v32u *)calloc(training_instances, sizeof(__v32u));
-
-    if (vector_size == 256) {
-        for (int i = 0; i < base_size; i += VSIZE) {
-            _vim64_fmovs(1, &base[i]);
-        }
-    } else {
-        for (int i = 0; i < base_size; i += VSIZE) {
-            _vim2K_fmovs(1, &base[i]);
-        }
-    }
-}
-
 inline void initialize_weights(__v32f *weights, int size) {
     if (vector_size == 256) {
         for (int i = 0; i < size; i += VSIZE) {
@@ -45,6 +8,18 @@ inline void initialize_weights(__v32f *weights, int size) {
     } else {
         for (int i = 0; i < size; i += VSIZE) {
             _vim2K_fmovs(0.5, &weights[i]);
+        }
+    }
+}
+
+inline void read_instance(__v32f *instance, int size) {
+    if (vector_size == 256) {
+        for (int i = 0; i < size; i += VSIZE) {
+            _vim64_fmovs(1.0, &instance[i]);
+        }
+    } else {
+        for (int i = 0; i < size; i += VSIZE) {
+            _vim2K_fmovs(1.0, &instance[i]);
         }
     }
 }
@@ -65,21 +40,25 @@ inline __v32f **initialize_mask(int stride, int n_masks) {
 __v32f *relu_layer() {
     int i, j, k, h_idx = 0;
 
-    int weight_size, mask_size;
+    int weight_size, mask_size, instance_size;
     __v32f **mask;
 
     if (inst_in_vec > 1) {
         weight_size = VSIZE;
+        instance_size = VSIZE;
         mask_size = VSIZE/training_features;
         mask = initialize_mask(training_features, mask_size);
     } else if (VSIZE/training_features > 1) {
+        instance_size = VSIZE;
         weight_size = training_features*(training_features/2); 
         mask_size = VSIZE/training_features;
         mask = initialize_mask(mask_size, mask_size);
     } else {
+        instance_size = n_vectors * VSIZE;
         weight_size = n_vectors * training_features/2 * VSIZE;
     }
 
+    __v32f *instance = (__v32f *)malloc(sizeof(__v32f) * instance_size);
     __v32f *weights = (__v32f *)calloc(weight_size, sizeof(__v32f));
     initialize_weights(weights, weight_size);
 
@@ -94,8 +73,9 @@ __v32f *relu_layer() {
     if (vector_size == 256) {
         _vim64_fmovs(1, bias);
         if (inst_in_vec > 1) {
-            for (i = 0; i < base_size; i += VSIZE) {
-                _vim64_fmuls(&base[i], weights, partial_mul);
+            for (i = 0; i < training_instances; i += inst_in_vec) {
+                read_instance(instance, instance_size);
+                _vim64_fmuls(instance, weights, partial_mul);
                 for (j = 0; j < mask_size; j++) {
                     _vim64_fmuls(partial_mul, mask[j], partial_acc);
                     _vim64_fcums(partial_acc, &p_hlayer[h_idx]);
@@ -109,8 +89,9 @@ __v32f *relu_layer() {
             }
         } else if (VSIZE/training_features > 1) {
             for (i = 0; i < training_instances; i++) {
+                read_instance(instance, instance_size);
                 for (j = 0; j < weight_size; j += VSIZE) {
-                    _vim64_fmuls(&base[i * VSIZE], &weights[j], partial_mul);
+                    _vim64_fmuls(instance, &weights[j], partial_mul);
                     for (k = 0; k < mask_size; k++) {
                         _vim64_fmuls(partial_mul, mask[k], partial_acc);
                         _vim64_fcums(partial_acc, &p_hlayer[h_idx]);   
@@ -123,10 +104,11 @@ __v32f *relu_layer() {
             }
         } else {
             for (i = 0; i < training_instances; i++) {
+                read_instance(instance, instance_size);
                 for (j = 0; j < weight_size; j += training_features) {
                     sum = 0.0;
                     for (k = 0; k < n_vectors * VSIZE; k += VSIZE) {
-                        _vim64_fmuls(&base[(i * VSIZE) + n_vectors], &weights[j + n_vectors], partial_mul);
+                        _vim64_fmuls(&instance[n_vectors], &weights[j + n_vectors], partial_mul);
                         _vim64_fcums(partial_mul, &p_sum);
                         sum += p_sum;
                     }
@@ -141,8 +123,9 @@ __v32f *relu_layer() {
     } else {
         _vim2K_fmovs(1, bias);
         if (inst_in_vec > 1) {
-            for (i = 0; i < base_size; i += VSIZE) {
-                _vim2K_fmuls(&base[i], weights, partial_mul);
+            for (i = 0; i < training_instances; i += inst_in_vec) {
+                read_instance(instance, instance_size);
+                _vim2K_fmuls(instance, weights, partial_mul);
                 for (j = 0; j < mask_size; j++) {
                     _vim2K_fmuls(partial_mul, mask[j], partial_acc);
                     _vim2K_fcums(partial_acc, &p_hlayer[h_idx]);
@@ -156,8 +139,9 @@ __v32f *relu_layer() {
             }
         } else if (VSIZE/training_features > 1) {
             for (i = 0; i < training_instances; i++) {
+                read_instance(instance, instance_size);
                 for (j = 0; j < weight_size; j += VSIZE) {
-                    _vim2K_fmuls(&base[i * VSIZE], &weights[j], partial_mul);
+                    _vim2K_fmuls(instance, &weights[j], partial_mul);
                     for (k = 0; k < mask_size; k++) {
                         _vim2K_fmuls(partial_mul, mask[k], partial_acc);
                         _vim2K_fcums(partial_acc, &p_hlayer[h_idx]);
@@ -170,10 +154,11 @@ __v32f *relu_layer() {
             }
         } else {
             for (i = 0; i < training_instances; i++) {
+                read_instance(instance, instance_size);
                 for (j = 0; j < weight_size; j += training_features) {
                     sum = 0.0;
                     for (k = 0; k < n_vectors * VSIZE; k += VSIZE) {
-                        _vim2K_fmuls(&base[(i * VSIZE) + n_vectors], &weights[j + n_vectors], partial_mul);
+                        _vim2K_fmuls(&instance[n_vectors], &weights[j + n_vectors], partial_mul);
                         _vim2K_fcums(partial_mul, &p_sum);
                         sum += p_sum;
                     }
@@ -202,6 +187,7 @@ __v32f *relu_layer() {
         }
         free(mask);    
     }
+    free(instance);
     free(p_hlayer);
     free(partial_mul);
     free(partial_acc);
@@ -326,11 +312,19 @@ void classification(__v32f *output_layer) {
 int main(int argc, char const *argv[]) {
     total_begin = clock();
 
-    read_begin = clock();
-    read_file(argv);
+    vector_size = atoi(argv[1]);
+    training_instances = atoi(argv[2]);
+    training_features = atoi(argv[3]);
     output_size = atoi(argv[4]);
-    read_end = clock();
-    read_spent = (double)(read_end - read_begin) / CLOCKS_PER_SEC;
+
+    if (vector_size == 256) {
+        VSIZE = VM64I;
+    } else {
+        VSIZE = VM2KI;
+    }
+
+    n_vectors = training_features/VSIZE;
+    inst_in_vec = VSIZE/(training_features*(training_features/2));
 
     hidden_begin = clock();
     __v32f *hidden_layer = relu_layer();
@@ -352,13 +346,11 @@ int main(int argc, char const *argv[]) {
     printf("*************************************\n");
     printf("* Execution time:         %fs *\n", total_spent);
     printf(" ***********************************\n");
-    printf("* Read time:              %fs *\n", read_spent);
     printf("* Input x Hidden layer:   %fs *\n", hidden_spent);
     printf("* Hidden x Output layer:  %fs *\n", output_spent);
     printf("* Classification time:    %fs *\n", class_spent);
     printf("*************************************\n");
-    free(base);
-    free(label);
+
     free(hidden_layer);
     free(output_layer);
     free(bias);

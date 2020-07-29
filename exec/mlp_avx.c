@@ -1,22 +1,5 @@
 #include "mlp_avx.h"
 
-void init_vec(char const *argv[]) {
-    training_instances = atoi(argv[1]);
-    training_features = atoi(argv[2]);
-
-    // base_size = training_features * training_instances;
-
-    // base = (float *)aligned_alloc(64, sizeof(float)*base_size);
-    // label = (__uint32_t *)aligned_alloc(64, sizeof(__uint32_t)*training_instances);
-
-    // __m512 avx_base;
-    // for(int i = 0; i < base_size; i += AVX_SIZE) {
-	// avx_base = _mm512_load_ps(&base[i]);
-	// avx_base = _mm512_set1_ps((float)1.0);
-	// _mm512_store_ps(&base[i], avx_base);
-    // }
-}
-
 void initialize_weights(float *weights, int size) {
     __m512 avx_weights;
     for (int i = 0; i < size; i += AVX_SIZE) {
@@ -219,11 +202,9 @@ void classification(float *output_layer) {
 int main(int argc, char const *argv[]) {
     total_begin = clock();
 
-    read_begin = clock();
-    init_vec(argv);
+    training_instances = atoi(argv[1]);
+    training_features = atoi(argv[2]);
     output_size = atoi(argv[3]);
-    read_end = clock();
-    read_spent = (double)(read_end - read_begin) / CLOCKS_PER_SEC;
 
     hidden_begin = clock();
     float *hidden_layer = relu_layer();
@@ -245,13 +226,11 @@ int main(int argc, char const *argv[]) {
     printf("*************************************\n");
     printf("* Execution time:         %fs *\n", total_spent);
     printf(" ***********************************\n");
-    printf("* Read time:              %fs *\n", read_spent);
     printf("* Input x Hidden layer:   %fs *\n", hidden_spent);
     printf("* Hidden x Output layer:  %fs *\n", output_spent);
     printf("* Classification time:    %fs *\n", class_spent);
     printf("*************************************\n");
-    // free(base);
-    // free(label);
+
     free(hidden_layer);
     free(output_layer);
     free(bias);
