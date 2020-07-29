@@ -4,7 +4,8 @@ void read_files(char const *argv[]) {
     read_begin = clock();
 
     training_instances = atoi(argv[1]);
-    training_features = atoi(argv[2]);
+    test_instances = atoi(argv[2]);
+    training_features = atoi(argv[3]);
 
     base_size = training_instances * training_features;
 
@@ -66,7 +67,7 @@ void read_test_instance(float *base, int size) {
 void classification(char const *argv[]) {
     int i, j, k, ed_idx = 0;
 
-    k_neighbors = atoi(argv[3]);
+    k_neighbors = atoi(argv[4]);
 
     int te_base_size = training_features;
     int masks;
@@ -84,9 +85,9 @@ void classification(char const *argv[]) {
     if (training_features < AVX_SIZE) {
         __mmask16 avx_mask[2] = {0xff00, 0xff};
         // for each test instance
-        for (i = 0; i < training_instances; i++) {
+        for (i = 0; i < test_instances; i++) {
             ed_idx = 0;
-            // read_test_instance(te_base, te_base_size);
+            read_test_instance(te_base, te_base_size);
             avx_tebase = _mm512_setr_ps(te_base[0], te_base[1], te_base[2], te_base[3], te_base[4], te_base[5], te_base[6], te_base[7],
                                         te_base[0], te_base[1], te_base[2], te_base[3], te_base[4], te_base[5], te_base[6], te_base[7]);
 
@@ -100,16 +101,16 @@ void classification(char const *argv[]) {
             }
             class_begin = clock();
             get_ksmallest(e_distance, tr_label, knn, k_neighbors);
-            // printf("%d. ", i);
+            printf("%d. ", i);
             votes(knn, k_neighbors);
             class_end = clock();
             class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
         }
     } else {
         int n_vector = training_features/AVX_SIZE;
-        for (i = 0; i < training_instances; i++) {
+        for (i = 0; i < test_instances; i++) {
             ed_idx = 0;
-            // read_test_instance(te_base, te_base_size);
+            read_test_instance(te_base, te_base_size);
             for (j = 0; j < base_size; j += training_features) {
                 for (k = 0; k < n_vector; k++) {
                     avx_trbase = _mm512_load_ps(&tr_base[j + k * AVX_SIZE]);
@@ -122,7 +123,7 @@ void classification(char const *argv[]) {
             }
             class_begin = clock();
             get_ksmallest(e_distance, tr_label, knn, k_neighbors);
-            // printf("%d. ", i);
+            printf("%d. ", i);
             votes(knn, k_neighbors);
             class_end = clock();
             class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
