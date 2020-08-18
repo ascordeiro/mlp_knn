@@ -92,7 +92,7 @@ void classification(char const *argv[]) {
     u_int32_t *knn = (u_int32_t *)calloc(k_neighbors, sizeof(u_int32_t));
     float **e_distance = (float **)aligned_alloc(64, test_instances * sizeof (float *));
     for (i = 0; i < test_instances; ++i) {
-        e_distance[i] = (float *)aligned_alloc(64, test_instances * sizeof (float));
+        e_distance[i] = (float *)aligned_alloc(64, training_instances * sizeof (float));
     } 
     float *te_base = (float *)aligned_alloc(64, te_base_size * sizeof(float));
 
@@ -110,8 +110,9 @@ void classification(char const *argv[]) {
                 avx_trbase = _mm512_load_ps(&tr_base[j]);
                 avx_psub = _mm512_sub_ps(avx_trbase, avx_tebase);
                 avx_pmul = _mm512_mul_ps(avx_psub, avx_psub);
-                for (k = 0; k < masks; k += AVX_SIZE) {
+                for (k = 0; k < masks; k++) {
                     e_distance[i][ed_idx++] = _mm512_mask_reduce_add_ps(avx_mask[k], avx_pmul);
+			printf("i: %d - ed_idx: %d\n", i, ed_idx);
                 }
             }
         }
@@ -129,6 +130,7 @@ void classification(char const *argv[]) {
                     e_distance[i][ed_idx] += _mm512_reduce_add_ps(avx_pmul);
                 }
                 ed_idx++;
+		printf("i: %d - ed_idx: %d\n", i, ed_idx);
             }
         }
     }
