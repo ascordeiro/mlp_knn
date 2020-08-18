@@ -162,7 +162,7 @@ void classification(char const *argv[]) {
                     for (k = 0; k < n_vectors; k++) {
                         _vim64_fsubs(&tr_base[(j * VSIZE * n_vectors) + (k * VSIZE)], &te_base[k * VSIZE], partial_sub);
                         _vim64_fmuls(partial_sub, partial_sub, partial_mul);
-                        _vim64_fcums(partial_acc, &partial_sum);
+                        _vim64_fcums(partial_mul, &partial_sum);
                         e_distance[i][j] += partial_sum;
 
                     }
@@ -189,7 +189,7 @@ void classification(char const *argv[]) {
                     for (k = 0; k < n_vectors; k++) {
                         _vim2K_fsubs(&tr_base[(j * VSIZE * n_vectors) + (k * VSIZE)], &te_base[k * VSIZE], partial_sub);
                         _vim2K_fmuls(partial_sub, partial_sub, partial_mul);
-                        _vim2K_fcums(partial_acc, &partial_sum);
+                        _vim2K_fcums(partial_mul, &partial_sum);
                         e_distance[i][j] += partial_sum;
                     }
                 }
