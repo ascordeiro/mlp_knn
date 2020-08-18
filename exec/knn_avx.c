@@ -12,19 +12,6 @@ void read_files(char const *argv[]) {
     tr_base = (float *)aligned_alloc(64, sizeof(float) * base_size);
     tr_label = (__uint32_t *)aligned_alloc(64, sizeof(__uint32_t)*training_instances);
     
-    for (int i = 0; i < base_size; i += 4) {
-        tr_base[i] = 0.5;
-        tr_base[i+1] = 1.0;
-        tr_base[i+2] = 1.5;
-        tr_base[i+3] = 2.0;
-    }
-    // __m512 avx_base;
-    // for(int i = 0; i < base_size; i += AVX_SIZE) {
-    //     avx_base = _mm512_load_ps(&tr_base[i]);
-    //     avx_base = _mm512_set1_ps((float)1.0);
-    //     _mm512_store_ps(&tr_base[i], avx_base);
-    // }
-
     read_end = clock();
     read_spent = (double)(read_end - read_begin) / CLOCKS_PER_SEC;
 }
@@ -61,18 +48,12 @@ void get_ksmallest(float *array, u_int32_t *label, u_int32_t *knn, int k) {
 }
 
 void read_test_instance(float *base, int size) {
-    for (int i = 0; i < size; i += 4) {
-        base[i] = 2.5;
-        base[i+1] = 2.0;
-        base[i+2] = 1.5;
-        base[i+3] = 1.0;
+    __m512 avx_base;
+    for(int i = 0; i < size; i += AVX_SIZE) {
+        avx_base = _mm512_load_ps(&base[i]);
+        avx_base = _mm512_set1_ps((float)1.0);
+        _mm512_store_ps(&base[i], avx_base);
     }
-    // __m512 avx_base;
-    // for(int i = 0; i < size; i += AVX_SIZE) {
-    //     avx_base = _mm512_load_ps(&base[i]);
-    //     avx_base = _mm512_set1_ps((float)1.0);
-    //     _mm512_store_ps(&base[i], avx_base);
-    // }
 }
 
 // sqrt(pow((x1 - y1), 2) + pow((x2 - y2), 2) + ... + pow((xn - yn), 2))
@@ -88,7 +69,6 @@ void classification(char const *argv[]) {
         masks = AVX_SIZE/training_features;
     }
 
-    __m512 avx_tebase, avx_trbase, avx_psub, avx_pmul;
     u_int32_t *knn = (u_int32_t *)calloc(k_neighbors, sizeof(u_int32_t));
     float **e_distance = (float **)aligned_alloc(64, test_instances * sizeof (float *));
     for (i = 0; i < test_instances; ++i) {
@@ -96,7 +76,9 @@ void classification(char const *argv[]) {
     } 
     float *te_base = (float *)aligned_alloc(64, te_base_size * sizeof(float));
 
-    ed_begin = clock();
+    __m512 avx_tebase, avx_trbase, avx_psub, avx_pmul;
+    // ed_begin = clock();
+    read_test_instance(tr_base, base_size);
     if (training_features < AVX_SIZE) {
         __mmask16 avx_mask[2] = {0xff00, 0xff};
         // for each test instance
@@ -112,7 +94,6 @@ void classification(char const *argv[]) {
                 avx_pmul = _mm512_mul_ps(avx_psub, avx_psub);
                 for (k = 0; k < masks; k++) {
                     e_distance[i][ed_idx++] = _mm512_mask_reduce_add_ps(avx_mask[k], avx_pmul);
-			printf("i: %d - ed_idx: %d\n", i, ed_idx);
                 }
             }
         }
@@ -130,24 +111,17 @@ void classification(char const *argv[]) {
                     e_distance[i][ed_idx] += _mm512_reduce_add_ps(avx_pmul);
                 }
                 ed_idx++;
-		printf("i: %d - ed_idx: %d\n", i, ed_idx);
             }
         }
     }
-    ed_end = clock();
-    ed_spent += (double)(ed_end - ed_begin) / CLOCKS_PER_SEC;
+    // ed_end = clock();
+    // ed_spent += (double)(ed_end - ed_begin) / CLOCKS_PER_SEC;
     
-    for (i = 0; i < test_instances; ++i) {
-        for (j = 0; j < training_instances; ++j) {
-            e_distance[i][j] = sqrt(e_distance[i][j]);
-        }
-    }
-    for (i = 0; i < test_instances; ++i) {
-        for (j = 0; j < training_instances; ++j) {
-            printf("%f ", e_distance[i][j]);
-        }
-        printf("\n");
-    }
+    // for (i = 0; i < test_instances; ++i) {
+    //     for (j = 0; j < training_instances; ++j) {
+    //         e_distance[i][j] = sqrt(e_distance[i][j]);
+    //     }
+    // }
 
     // class_begin = clock();
     // for (i = 0; i < test_instances; ++i) {
