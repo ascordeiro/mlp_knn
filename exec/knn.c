@@ -26,15 +26,21 @@ void read_files(char const *argv[]) {
     tr_base = (__v32f *)calloc(tr_base_size, sizeof(__v32f));
     tr_label = (__v32u *)calloc(label_instances * VSIZE, sizeof(__v32u));
 
-    if (vector_size == 256) {
-        for (int i = 0; i < tr_base_size; i += VSIZE) {
-            _vim64_fmovs(1, &tr_base[i]);
-        }
-    } else {
-        for (int i = 0; i < tr_base_size; i += VSIZE) {
-            _vim2K_fmovs(1, &tr_base[i]);
-        }
+    for (int i = 0; i < tr_base_size; i += 4) {
+        tr_base[i] = 0.5;
+        tr_base[i+1] = 1.0;
+        tr_base[i+2] = 1.5;
+        tr_base[i+3] = 2.0;
     }
+    // if (vector_size == 256) {
+    //     for (int i = 0; i < tr_base_size; i += VSIZE) {
+    //         _vim64_fmovs(1, &tr_base[i]);
+    //     }
+    // } else {
+    //     for (int i = 0; i < tr_base_size; i += VSIZE) {
+    //         _vim2K_fmovs(1, &tr_base[i]);
+    //     }
+    // }
     read_end = clock();
     read_spent = (double)(read_end - read_begin) / CLOCKS_PER_SEC;
 }
@@ -71,15 +77,34 @@ void get_ksmallest(__v32f *array, __v32u *label, __v32u *knn, int k) {
 }
 
 void read_test_instance(__v32f *base, int size) {
-    if (vector_size == 256) {
-        for (int i = 0; i < size; i += VSIZE) {
-            _vim64_fmovs(1, &base[i]);
-        }
-    } else {
-        for (int i = 0; i < size; i += VSIZE) {
-            _vim2K_fmovs(1, &base[i]);
+    for (int i = 0; i < size; i += 4) {
+        base[i] = 2.5;
+        base[i+1] = 2.0;
+        base[i+2] = 1.5;
+        base[i+3] = 1.0;
+    }
+    // if (vector_size == 256) {
+    //     for (int i = 0; i < size; i += VSIZE) {
+    //         _vim64_fmovs(1, &base[i]);
+    //     }
+    // } else {
+    //     for (int i = 0; i < size; i += VSIZE) {
+    //         _vim2K_fmovs(1, &base[i]);
+    //     }
+    // }
+}
+
+inline __v32f **initialize_mask(int stride, int n_masks) {
+    __v32f **mask = (__v32f **)calloc(n_masks, sizeof(__v32f *));
+    for (int i = 0; i < n_masks; i++) {
+        mask[i] = (__v32f *)calloc(VSIZE, sizeof(__v32f));
+    }
+    for (int i = 0; i < n_masks; i++) {
+        for (int j = i * stride; j < (i * stride) + stride; j++) {
+            mask[i][j] = 1.0;
         }
     }
+    return mask;
 }
 
 // sqrt(pow((x1 - y1), 2) + pow((x2 - y2), 2) + ... + pow((xn - yn), 2))
@@ -98,8 +123,8 @@ void classification(char const *argv[]) {
     te_base = (__v32f *)calloc(n_vectors * VSIZE, sizeof(__v32f));
     read_test_instance(te_base, n_vectors * VSIZE);
 
-    __v32f **e_distance = (__v32f **)calloc(n_instances, sizeof(__v32f *));
-    for (i = 0; i < n_instances; ++i) {
+    __v32f **e_distance = (__v32f **)calloc(test_instances, sizeof(__v32f *));
+    for (i = 0; i < test_instances; ++i) {
         e_distance[i] = (__v32f *)calloc(training_instances, sizeof(__v32f));
     }
     __v32u *knn = (__v32u *)calloc(k_neighbors, sizeof(__v32u));
@@ -108,10 +133,12 @@ void classification(char const *argv[]) {
     __v32f *partial_acc = (__v32f *)malloc(sizeof(__v32f) * VSIZE);
     __v32f **mask;
     if (training_features < VSIZE) {
-        mask = (__v32f **)calloc(n_instances, sizeof(__v32f *));
-        for (int i = 0; i < n_instances; ++i) {
-            mask[i] = (__v32f *)calloc(VSIZE, sizeof(__v32f));
-        }
+        // mask = (__v32f **)calloc(n_instances, sizeof(__v32f *));
+        // for (int i = 0; i < n_instances; ++i) {
+        //     mask[i] = (__v32f *)calloc(VSIZE, sizeof(__v32f));
+        // }
+        mask = initialize_mask(training_features, n_instances);
+
     }
 
     ed_begin = clock();
@@ -124,17 +151,9 @@ void classification(char const *argv[]) {
                     _vim64_fmuls(partial_sub, partial_sub, partial_mul);
                     for (k = 0; k < n_instances; k++) {
                         _vim64_fmuls(partial_mul, mask[k], partial_acc);
-                        _vim64_fcums(partial_acc, &partial_sum);
-                        e_distance[k][j] = sqrt(partial_sum);
+                        _vim64_fcums(partial_acc, &e_distance[i + k][j]);
                     }
                 }
-                class_begin = clock();
-                for (j = 0, jj = i; j < n_instances && jj < i + n_instances; ++j, ++jj) {
-                    get_ksmallest(e_distance[j], tr_label, knn, k_neighbors);
-                    votes(knn, k_neighbors);
-                }
-                class_end = clock();
-                class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
             }
         } else {
             for (i = 0; i < test_instances; i++) {
@@ -144,14 +163,10 @@ void classification(char const *argv[]) {
                         _vim64_fsubs(&tr_base[(j * VSIZE * n_vectors) + (k * VSIZE)], &te_base[k * VSIZE], partial_sub);
                         _vim64_fmuls(partial_sub, partial_sub, partial_mul);
                         _vim64_fcums(partial_acc, &partial_sum);
-                        e_distance[0][j] += partial_sum;
+                        e_distance[i][j] += partial_sum;
+
                     }
                 }
-                class_begin = clock();
-                get_ksmallest(e_distance[0], tr_label, knn, k_neighbors);
-                votes(knn, k_neighbors);
-                class_end = clock();
-                class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
             }
         }
     } else {
@@ -163,17 +178,9 @@ void classification(char const *argv[]) {
                     _vim2K_fmuls(partial_sub, partial_sub, partial_mul);
                     for (k = 0; k < n_instances; k++) {
                         _vim2K_fmuls(partial_mul, mask[k], partial_acc);
-                        _vim2K_fcums(partial_acc, &partial_sum);
-                        e_distance[k][j] = sqrt(partial_sum);
+                        _vim2K_fcums(partial_acc, &e_distance[i + k][j]);
                     }
                 }
-                class_begin = clock();
-                for (j = 0, jj = i; j < n_instances && jj < i + n_instances; ++j, ++jj) {
-                    get_ksmallest(e_distance[j], tr_label, knn, k_neighbors);
-                    votes(knn, k_neighbors);
-                }
-                class_end = clock();
-                class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
             }
         } else {
             for (i = 0; i < test_instances; i++) {
@@ -183,19 +190,35 @@ void classification(char const *argv[]) {
                         _vim2K_fsubs(&tr_base[(j * VSIZE * n_vectors) + (k * VSIZE)], &te_base[k * VSIZE], partial_sub);
                         _vim2K_fmuls(partial_sub, partial_sub, partial_mul);
                         _vim2K_fcums(partial_acc, &partial_sum);
-                        e_distance[0][j] += partial_sum;
+                        e_distance[i][j] += partial_sum;
                     }
                 }
-                class_begin = clock();
-                get_ksmallest(e_distance[0], tr_label, knn, k_neighbors);
-                votes(knn, k_neighbors);
-                class_end = clock();
-                class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
             }
         }
     }
+
+    for (i = 0; i < test_instances; ++i) {
+        for (j = 0; j < training_instances; ++j) {
+            e_distance[i][j] = sqrt(e_distance[i][j]);
+        }
+    }
+    for (i = 0; i < test_instances; ++i) {
+        for (j = 0; j < training_instances; ++j) {
+            printf("%f ", e_distance[i][j]);
+        }
+        printf("\n");
+    }
     ed_end = clock();
-    ed_spent = (double)(ed_end - ed_begin - class_spent)/CLOCKS_PER_SEC;
+    ed_spent = (double)(ed_end - ed_begin)/CLOCKS_PER_SEC;
+
+    // class_begin = clock();
+    // for (i = 0; i < test_instances; ++i) {
+    //     get_ksmallest(e_distance[i], tr_label, knn, k_neighbors);
+    //     votes(knn, k_neighbors);
+    // }
+    // class_end = clock();
+    // class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
+
 
     free(knn);
     for (i = 0; i < n_instances; i++) {
