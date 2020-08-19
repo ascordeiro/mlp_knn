@@ -116,14 +116,14 @@ void classification(char const *argv[]) {
             }
         }
     }
-    ed_end = clock();
-    ed_spent += (double)(ed_end - ed_begin) / CLOCKS_PER_SEC;
     
     for (i = 0; i < test_instances; ++i) {
         for (j = 0; j < training_instances; ++j) {
             e_distance[i][j] = sqrt(e_distance[i][j]);
         }
     }
+    ed_end = clock();
+    ed_spent += (double)(ed_end - ed_begin) / CLOCKS_PER_SEC;
 
     class_begin = clock();
     for (i = 0; i < test_instances; ++i) {
