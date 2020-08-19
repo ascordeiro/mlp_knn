@@ -40,11 +40,13 @@ void votes(__v32u *knn, int k) {
             neg++;
         }
     }
-    // if (pos > neg) {
-    //     printf("%s\n", "pos");
-    // } else {
-    //     printf("%s\n", "neg");
-    // }
+    if(test_instances - 1 == 255) {
+        if (pos > neg) {
+            printf("%s\n", "pos");
+        } else {
+            printf("%s\n", "neg");
+        }
+    }
 }
 
 void get_ksmallest(__v32f *array, __v32u *label, __v32u *knn, int k) {
@@ -79,11 +81,11 @@ inline __v32f **initialize_mask(int stride, int n_masks) {
     for (int i = 0; i < n_masks; i++) {
         mask[i] = (__v32f *)calloc(VSIZE, sizeof(__v32f));
     }
-    // for (int i = 0; i < n_masks; i++) {
-    //     for (int j = i * stride; j < (i * stride) + stride; j++) {
-    //         mask[i][j] = 1.0;
-    //     }
-    // }
+    for (int i = 0; i < n_masks; i++) {
+        for (int j = i * stride; j < (i * stride) + stride; j++) {
+            mask[i][j] = 1.0;
+        }
+    }
     return mask;
 }
 
@@ -140,7 +142,7 @@ void classification(char const *argv[]) {
                         _vim64_fsubs(&tr_base[(j * VSIZE * n_vectors) + (k * VSIZE)], &te_base[k * VSIZE], partial_sub);
                         _vim64_fmuls(partial_sub, partial_sub, partial_mul);
                         _vim64_fcums(partial_mul, &partial_sum);
-                        // e_distance[i][j] += partial_sum;
+                        e_distance[i][j] += partial_sum;
 
                     }
                 }
@@ -167,28 +169,28 @@ void classification(char const *argv[]) {
                         _vim2K_fsubs(&tr_base[(j * VSIZE * n_vectors) + (k * VSIZE)], &te_base[k * VSIZE], partial_sub);
                         _vim2K_fmuls(partial_sub, partial_sub, partial_mul);
                         _vim2K_fcums(partial_mul, &partial_sum);
-                        // e_distance[i][j] += partial_sum;
+                        e_distance[i][j] += partial_sum;
                     }
                 }
             }
         }
     }
 
-    // for (i = 0; i < test_instances; ++i) {
-    //     for (j = 0; j < training_instances; ++j) {
-    //         e_distance[i][j] = sqrt(e_distance[i][j]);
-    //     }
-    // }
-    // ed_end = clock();
-    // ed_spent = (double)(ed_end - ed_begin)/CLOCKS_PER_SEC;
+    for (i = 0; i < test_instances; ++i) {
+        for (j = 0; j < training_instances; ++j) {
+            e_distance[i][j] = sqrt(e_distance[i][j]);
+        }
+    }
+    ed_end = clock();
+    ed_spent = (double)(ed_end - ed_begin)/CLOCKS_PER_SEC;
 
-    // class_begin = clock();
-    // for (i = 0; i < test_instances; ++i) {
-    //     get_ksmallest(e_distance[i], tr_label, knn, k_neighbors);
-    //     votes(knn, k_neighbors);
-    // }
-    // class_end = clock();
-    // class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
+    class_begin = clock();
+    for (i = 0; i < test_instances; ++i) {
+        get_ksmallest(e_distance[i], tr_label, knn, k_neighbors);
+        votes(knn, k_neighbors);
+    }
+    class_end = clock();
+    class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
 
 
     free(knn);

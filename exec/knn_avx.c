@@ -25,11 +25,13 @@ void votes(u_int32_t *knn, int k) {
             neg++;
         }
     }
-    // if (pos > neg) {
-    //     printf("%s\n", "pos");
-    // } else {
-    //     printf("%s\n", "neg");
-    // }
+    if (test_instances -1 == 255) {
+        if (pos > neg) {
+            printf("%s\n", "pos");
+        } else {
+            printf("%s\n", "neg");
+        }
+    }
 }
 
 void get_ksmallest(float *array, u_int32_t *label, u_int32_t *knn, int k) {
@@ -114,22 +116,22 @@ void classification(char const *argv[]) {
             }
         }
     }
-    // ed_end = clock();
-    // ed_spent += (double)(ed_end - ed_begin) / CLOCKS_PER_SEC;
+    ed_end = clock();
+    ed_spent += (double)(ed_end - ed_begin) / CLOCKS_PER_SEC;
     
-    // for (i = 0; i < test_instances; ++i) {
-    //     for (j = 0; j < training_instances; ++j) {
-    //         e_distance[i][j] = sqrt(e_distance[i][j]);
-    //     }
-    // }
+    for (i = 0; i < test_instances; ++i) {
+        for (j = 0; j < training_instances; ++j) {
+            e_distance[i][j] = sqrt(e_distance[i][j]);
+        }
+    }
 
-    // class_begin = clock();
-    // for (i = 0; i < test_instances; ++i) {
-    //     get_ksmallest(e_distance[i], tr_label, knn, k_neighbors);
-    //     votes(knn, k_neighbors);
-    // }
-    // class_end = clock();
-    // class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
+    class_begin = clock();
+    for (i = 0; i < test_instances; ++i) {
+        get_ksmallest(e_distance[i], tr_label, knn, k_neighbors);
+        votes(knn, k_neighbors);
+    }
+    class_end = clock();
+    class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
     
     free(knn);
     free(e_distance);
