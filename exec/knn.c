@@ -24,8 +24,8 @@ void read_files(char const *argv[]) {
     }
 
     tr_base_size = training_instances * n_vectors * VSIZE;
-    tr_base = (__v32f *)calloc(tr_base_size, sizeof(__v32f));
-    tr_label = (__v32u *)calloc(label_instances * VSIZE, sizeof(__v32u));
+    tr_base = (__v32f *)malloc(tr_base_size * sizeof(__v32f));
+    tr_label = (__v32u *)malloc(label_instances * VSIZE * sizeof(__v32u));
 
     read_end = clock();
     read_spent = (double)(read_end - read_begin) / CLOCKS_PER_SEC;
@@ -77,9 +77,9 @@ void read_test_instance(__v32f *base, int size) {
 }
 
 inline __v32f **initialize_mask(int stride, int n_masks) {
-    __v32f **mask = (__v32f **)calloc(n_masks, sizeof(__v32f *));
+    __v32f **mask = (__v32f **)malloc(n_masks * sizeof(__v32f *));
     for (int i = 0; i < n_masks; i++) {
-        mask[i] = (__v32f *)calloc(VSIZE, sizeof(__v32f));
+        mask[i] = (__v32f *)malloc(VSIZE * sizeof(__v32f));
     }
     for (int i = 0; i < n_masks; i++) {
         for (int j = i * stride; j < (i * stride) + stride; j++) {
@@ -102,13 +102,13 @@ void classification(char const *argv[]) {
         n_instances = VSIZE/training_features;
     }
 
-    te_base = (__v32f *)calloc(n_vectors * VSIZE, sizeof(__v32f));
+    te_base = (__v32f *)malloc(n_vectors * VSIZE * sizeof(__v32f));
 
-    __v32f **e_distance = (__v32f **)calloc(test_instances, sizeof(__v32f *));
+    __v32f **e_distance = (__v32f **)malloc(test_instances * sizeof(__v32f *));
     for (i = 0; i < test_instances; ++i) {
-        e_distance[i] = (__v32f *)calloc(training_instances, sizeof(__v32f));
+        e_distance[i] = (__v32f *)malloc(training_instances * sizeof(__v32f));
     }
-    __v32u *knn = (__v32u *)calloc(k_neighbors, sizeof(__v32u));
+    __v32u *knn = (__v32u *)malloc(k_neighbors * sizeof(__v32u));
     __v32f *partial_sub = (__v32f *)malloc(sizeof(__v32f) * n_vectors * VSIZE);
     __v32f *partial_mul = (__v32f *)malloc(sizeof(__v32f) * n_vectors * VSIZE);
     __v32f *partial_acc = (__v32f *)malloc(sizeof(__v32f) * VSIZE);
@@ -180,18 +180,14 @@ void classification(char const *argv[]) {
         for (j = 0; j < training_instances; ++j) {
             e_distance[i][j] = sqrt(e_distance[i][j]);
         }
+        class_begin = clock();
+        get_ksmallest(e_distance[i], tr_label, knn, k_neighbors);
+        votes(knn, k_neighbors);
+        class_end = clock();
+        class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
     }
     ed_end = clock();
     ed_spent = (double)(ed_end - ed_begin)/CLOCKS_PER_SEC;
-
-    class_begin = clock();
-    for (i = 0; i < test_instances; ++i) {
-        get_ksmallest(e_distance[i], tr_label, knn, k_neighbors);
-        votes(knn, k_neighbors);
-    }
-    class_end = clock();
-    class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
-
 
     free(knn);
     for (i = 0; i < n_instances; i++) {

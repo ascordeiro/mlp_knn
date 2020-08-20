@@ -71,7 +71,7 @@ void classification(char const *argv[]) {
         masks = AVX_SIZE/training_features;
     }
 
-    u_int32_t *knn = (u_int32_t *)calloc(k_neighbors, sizeof(u_int32_t));
+    u_int32_t *knn = (u_int32_t *)malloc(k_neighbors * sizeof(u_int32_t));
     float **e_distance = (float **)aligned_alloc(64, test_instances * sizeof (float *));
     for (i = 0; i < test_instances; ++i) {
         e_distance[i] = (float *)aligned_alloc(64, training_instances * sizeof (float));
@@ -121,17 +121,15 @@ void classification(char const *argv[]) {
         for (j = 0; j < training_instances; ++j) {
             e_distance[i][j] = sqrt(e_distance[i][j]);
         }
+        class_begin = clock();
+        get_ksmallest(e_distance[i], tr_label, knn, k_neighbors);
+        votes(knn, k_neighbors);
+        class_end = clock();
+        class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
     }
     ed_end = clock();
     ed_spent += (double)(ed_end - ed_begin) / CLOCKS_PER_SEC;
 
-    class_begin = clock();
-    for (i = 0; i < test_instances; ++i) {
-        get_ksmallest(e_distance[i], tr_label, knn, k_neighbors);
-        votes(knn, k_neighbors);
-    }
-    class_end = clock();
-    class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
     
     free(knn);
     free(e_distance);
