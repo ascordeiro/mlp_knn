@@ -28,18 +28,7 @@ void read_files(char const *argv[]) {
     // tr_label = (__v32u *)malloc(label_instances * VSIZE * sizeof(__v32u));
 
     tr_base = (__v32f *)aligned_alloc(vector_size, sizeof(__v32f) * tr_base_size);
-    printf("tr_base 1024-byte aligned addr: vault %20llu - ptr:%p\n", (((long int)tr_base>>8) &31));
-    printf("tr_base vector_base: %20llu - ptr:%p\n", (void*)tr_base, &tr_base);
-    printf("tr_base position_0: %20llu - ptr:%p\n", (void*)&tr_base[0], &tr_base);
-    printf("tr_base position_1: %20llu - ptr:%p\n", (void*)&tr_base[1], &tr_base);
-    printf("tr_base position_f: %20llu - ptr:%p\n\n", (void*)&tr_base[tr_base_size], &tr_base);
-
     tr_label = (__v32u *)aligned_alloc(vector_size, sizeof(__v32u)*training_instances);
-    printf("tr_label 1024-byte aligned addr: vault %20llu - ptr:%p\n", (((long int)tr_label>>8) &31));
-    printf("tr_label vector_base: %20llu - ptr:%p\n", (void*)tr_label, &tr_label);
-    printf("tr_label position_0: %20llu - ptr:%p\n", (void*)&tr_label[0], &tr_label);
-    printf("tr_label position_1: %20llu - ptr:%p\n", (void*)&tr_label[1], &tr_label);
-    printf("tr_label position_f: %20llu - ptr:%p\n\n", (void*)&tr_label[training_instances], &tr_label); 
 
     read_end = clock();
     read_spent = (double)(read_end - read_begin) / CLOCKS_PER_SEC;
@@ -84,8 +73,13 @@ void read_test_instance(__v32f *base, int size) {
             _vim64_fmovs(1, &base[i]);
         }
     } else {
-        for (int i = 0; i < size; i += VSIZE) {
-            _vim2K_fmovs(1, &base[i]);
+        // for (int i = 0; i < size; i += VSIZE) {
+        for (int i = 0; i < size; i += 4) {
+            base[i] = 3.5;
+            base[i + 1] = 3.0;
+            base[i + 2] = 2.5;
+            base[i + 3] = 2.0;
+            // _vim2K_fmovs(1, &base[i]);
         }
     }
 }
@@ -95,11 +89,6 @@ inline __v32f **initialize_mask(int stride, int n_masks) {
     for (int i = 0; i < n_masks; i++) {
         mask[i] = (__v32f *)malloc(VSIZE * sizeof(__v32f));
     }
-    printf("mask 1024-byte aligned addr: vault %20llu - ptr:%p\n", (((long int)mask>>8) &31));
-    printf("mask vector_base: %20llu - ptr:%p\n", (void*)mask, &mask);
-    printf("mask position_0: %20llu - ptr:%p\n", (void*)&mask[0], &mask);
-    printf("mask position_1: %20llu - ptr:%p\n", (void*)&mask[1], &mask);
-    printf("mask position_f: %20llu - ptr:%p\n\n", (void*)&mask[n_masks], &mask); 
     for (int i = 0; i < n_masks; i++) {
         for (int j = i * stride; j < (i * stride) + stride; j++) {
             mask[i][j] = 1.0;
@@ -110,7 +99,7 @@ inline __v32f **initialize_mask(int stride, int n_masks) {
 
 // sqrt(pow((x1 - y1), 2) + pow((x2 - y2), 2) + ... + pow((xn - yn), 2))
 void classification(char const *argv[]) {
-    int i, j, jj, k;
+    uint32_t i, j, jj, k;
     __v32f partial_sum;
     __v32f *te_base;
 
@@ -122,49 +111,15 @@ void classification(char const *argv[]) {
     }
 
     te_base = (__v32f *)aligned_alloc(vector_size, n_vectors * VSIZE * sizeof(__v32f));
-    printf("te_base 1024-byte aligned addr: vault %20llu - ptr:%p\n", (((long int)te_base>>8) &31));
-    printf("te_base vector_base: %20llu - ptr:%p\n", (void*)te_base, &te_base);
-    printf("te_base position_0: %20llu - ptr:%p\n", (void*)&te_base[0], &te_base);
-    printf("te_base position_1: %20llu - ptr:%p\n", (void*)&te_base[1], &te_base);
-    printf("te_base position_f: %20llu - ptr:%p\n\n", (void*)&te_base[n_vectors * VSIZE], &te_base); 
 
     __v32f **e_distance = (__v32f **)aligned_alloc(vector_size, test_instances * sizeof(__v32f *));
     for (i = 0; i < test_instances; ++i) {
         e_distance[i] = (__v32f *)aligned_alloc(vector_size, training_instances * sizeof(__v32f));
     }
-    printf("e_distance 1024-byte aligned addr: vault %20llu - ptr:%p\n", (((long int)e_distance>>8) &31));
-    printf("e_distance vector_base: %20llu - ptr:%p\n", (void*)e_distance, &e_distance);
-    printf("e_distance position_0: %20llu - ptr:%p\n", (void*)&e_distance[0], &e_distance);
-    printf("e_distance position_1: %20llu - ptr:%p\n", (void*)&e_distance[1], &e_distance);
-    printf("e_distance position_f: %20llu - ptr:%p\n\n", (void*)&e_distance[test_instances], &e_distance); 
-
     __v32u *knn = (__v32u *)malloc(k_neighbors * sizeof(__v32u));
-    // printf("knn 1024-byte aligned addr: vault %20llu - ptr:%p\n", (((long int)knn>>8) &31));
-    // printf("knn vector_base: %20llu - ptr:%p\n", (void*)knn, &knn);
-    // printf("knn position_0: %20llu - ptr:%p\n", (void*)&knn[0], &knn);
-    // printf("knn position_1: %20llu - ptr:%p\n", (void*)&knn[1], &knn);
-    // printf("knn position_f: %20llu - ptr:%p\n\n", (void*)&knn[k_neighbors], &knn); 
-
     __v32f *partial_sub = (__v32f *)malloc(sizeof(__v32f) * n_vectors * VSIZE);
-    printf("partial_sub 1024-byte aligned addr: vault %20llu - ptr:%p\n", (((long int)partial_sub>>8) &31));
-    printf("partial_sub vector_base: %20llu - ptr:%p\n", (void*)partial_sub, &partial_sub);
-    printf("partial_sub position_0: %20llu - ptr:%p\n", (void*)&partial_sub[0], &partial_sub);
-    printf("partial_sub position_1: %20llu - ptr:%p\n", (void*)&partial_sub[1], &partial_sub);
-    printf("partial_sub position_f: %20llu - ptr:%p\n\n", (void*)&partial_sub[n_vectors * VSIZE], &partial_sub); 
-
     __v32f *partial_mul = (__v32f *)malloc(sizeof(__v32f) * n_vectors * VSIZE);
-    printf("partial_mul 1024-byte aligned addr: vault %20llu - ptr:%p\n", (((long int)partial_mul>>8) &31));
-    printf("partial_mul vector_base: %20llu - ptr:%p\n", (void*)partial_mul, &partial_mul);
-    printf("partial_mul position_0: %20llu - ptr:%p\n", (void*)&partial_mul[0], &partial_mul);
-    printf("partial_mul position_1: %20llu - ptr:%p\n", (void*)&partial_mul[1], &partial_mul);
-    printf("partial_mul position_f: %20llu - ptr:%p\n\n", (void*)&partial_mul[n_vectors * VSIZE], &partial_mul); 
-
     __v32f *partial_acc = (__v32f *)malloc(sizeof(__v32f) * VSIZE);
-    printf("partial_acc 1024-byte aligned addr: vault %20llu - ptr:%p\n", (((long int)partial_acc>>8) &31));
-    printf("partial_acc vector_base: %20llu - ptr:%p\n", (void*)partial_acc, &partial_acc);
-    printf("partial_acc position_0: %20llu - ptr:%p\n", (void*)&partial_acc[0], &partial_acc);
-    printf("partial_acc position_1: %20llu - ptr:%p\n", (void*)&partial_acc[1], &partial_acc);
-    printf("partial_acc position_f: %20llu - ptr:%p\n\n", (void*)&partial_acc[VSIZE], &partial_acc); 
 
     __v32f **mask;
     if (training_features < VSIZE) {
@@ -203,18 +158,86 @@ void classification(char const *argv[]) {
             }
         }
     } else {
+        int test_vectors = test_instances/n_instances, ed_idx = 0;
+        __v32f *p_acc;
+        __v32f *tests;
+        __v32f *p_sub = (__v32f *)aligned_alloc(vector_size, sizeof(__v32f) * training_instances * test_vectors * VSIZE);
+        __v32f *p_mul = (__v32f *)aligned_alloc(vector_size, sizeof(__v32f) * training_instances * test_vectors * VSIZE);
+        __v32f *e_dst = (__v32f *)aligned_alloc(vector_size, sizeof(__v32f) * test_instances * training_instances);
+
         if (training_features < VSIZE) {
-            for (i = 0; i < test_instances; i += n_instances) {
-                read_test_instance(te_base, VSIZE);
-                for (j = 0; j < training_instances; j++) {
-                    _vim2K_fsubs(&tr_base[j * VSIZE], te_base, partial_sub);
-                    _vim2K_fmuls(partial_sub, partial_sub, partial_mul);
-                    for (k = 0; k < n_instances; k++) {
-                        _vim2K_fmuls(partial_mul, mask[k], partial_acc);
-                        _vim2K_fcums(partial_acc, &e_distance[i + k][j]);
+
+            if (training_features == 8) {
+                p_acc = (__v32f *)aligned_alloc(vector_size, sizeof(__v32f) * n_instances * VSIZE);
+                tests = (__v32f *)aligned_alloc(vector_size, sizeof(__v32f) * VSIZE);
+
+                for (i = 0; i < tr_base_size; i += VSIZE) {
+                        _vim2K_fmovs(1.0, tests);
+                        _vim2K_fsubs(&tr_base[i], tests, &p_sub[i]);
+                }
+                for (i = 0; i < training_instances * VSIZE; i += VSIZE) {
+                    _vim2K_fmuls(&p_sub[i], &p_sub[i], &p_mul[i]);
+                }
+                for (i = 0; i < training_instances * VSIZE; i += VSIZE) {
+                    for (j = 0; j < n_instances; ++j) {
+                        _vim2K_fmuls(&p_mul[i], mask[j], &p_acc[j * VSIZE]);
+                    }
+                    for (j = 0; j < n_instances; ++j) {
+                        _vim2K_fcums(&p_acc[j * VSIZE], &e_dst[ed_idx++]);
+                    }
+                }
+
+            } else {
+                p_acc = (__v32f *)aligned_alloc(vector_size, sizeof(__v32f) * 2 * n_instances * VSIZE);
+                tests = (__v32f *)aligned_alloc(vector_size, sizeof(__v32f) * 2 * VSIZE); 
+
+                for (i = 0; i < tr_base_size; i += VSIZE) {
+                    for (j = 0; j < test_instances; j += n_instances * 2) {
+                        _vim2K_fmovs(1.0, &tests[0]);
+                        _vim2K_fmovs(1.0, &tests[VSIZE]);
+                        _vim2K_fsubs(&tr_base[i], &tests[0], &p_sub[i * 2]);
+                        _vim2K_fsubs(&tr_base[i], &tests[VSIZE], &p_sub[i * 2 + VSIZE]);
+                    }
+                }
+                for (i = 0; i < training_instances * VSIZE * test_vectors; i += VSIZE * 2) {
+                    _vim2K_fmuls(&p_sub[i], &p_sub[i], &p_mul[i]);
+                    _vim2K_fmuls(&p_sub[i + VSIZE], &p_sub[i + VSIZE], &p_mul[i + VSIZE]);
+                }
+                for (i = 0; i < training_instances * VSIZE * test_vectors; i += VSIZE * 2) {
+                    for (j = 0; j < n_instances; ++j) {
+                        _vim2K_fmuls(&p_mul[i], mask[j], &p_acc[j * 2 * VSIZE]);
+                        _vim2K_fmuls(&p_mul[i + VSIZE], mask[j], &p_acc[(j * 2 * VSIZE + VSIZE)]);
+                    }
+                    for (j = 0; j < n_instances; ++j) {
+                        _vim2K_fcums(&p_acc[j * VSIZE * 2], &e_dst[ed_idx]);
+                        _vim2K_fcums(&p_acc[j * VSIZE * 2 + VSIZE], &e_dst[ed_idx + n_instances]);
+                        ed_idx++;
                     }
                 }
             }
+
+            for (i = 0; i < test_instances * training_instances; i += 4) {
+                e_dst[i] = sqrt(e_dst[i]);
+                e_dst[i + 1] = sqrt(e_dst[i + 1]);
+                e_dst[i + 2] = sqrt(e_dst[i + 2]);
+                e_dst[i + 3] = sqrt(e_dst[i + 3]);
+            }
+            free(p_sub);
+            free(p_mul);
+            free(tests);
+            free(p_acc);
+            free(e_dst);
+            // for (i = 0; i < test_instances; i += n_instances) {
+            //     read_test_instance(te_base, VSIZE);
+            //     for (j = 0; j < training_instances; j++) {
+            //         _vim2K_fsubs(&tr_base[j * VSIZE], te_base, partial_sub);
+            //         _vim2K_fmuls(partial_sub, partial_sub, partial_mul);
+            //         for (k = 0; k < n_instances; k++) {
+            //             _vim2K_fmuls(partial_mul, mask[k], partial_acc);
+            //             _vim2K_fcums(partial_acc, &e_distance[i + k][j]);
+            //         }
+            //     }
+            // }
         } else {
             for (i = 0; i < test_instances; i++) {
                 read_test_instance(te_base, n_vectors * VSIZE);
