@@ -80,12 +80,24 @@ void classification(char const *argv[]) {
 
     // ed_begin = clock();
     if (vector_size == 256) {
-        for (int i = 0; i < training_instances * training_features; i += VSIZE) {
-            _vim64_fmovs(1.0, &tr_base[i]);
+        // for (int i = 0; i < training_instances * training_features; i += VSIZE) {
+        //     _vim64_fmovs(1.0, &tr_base[i]);
+        // }
+        // for (int i = 0; i < test_instances * training_features; i += VSIZE) {
+        //     _vim64_fmovs(1.0, &te_base[i]);
+        // }
+        for (int i = 0; i < training_instances * training_features; i += 4) {
+            tr_base[i] = 0.5;
+            tr_base[i + 1] = 1.0;
+            tr_base[i + 2] = 1.5;
+            tr_base[i + 3] = 2.0;
         }
-        for (int i = 0; i < test_instances * training_features; i += VSIZE) {
-            _vim64_fmovs(1.0, &te_base[i]);
-        }
+        for (int i = 0; i < test_instances * training_features; i += 4) {
+            te_base[i] = 3.5;
+            te_base[i + 1] = 3.0;
+            te_base[i + 2] = 2.5;
+            te_base[i + 3] = 2.0;
+        }        
         if (training_features < VSIZE) {
             for (i = 0; i < training_instances; ++i) {
                 _vim64_fmuls(&tr_base[i * training_features], mask, temp_train);
@@ -110,12 +122,24 @@ void classification(char const *argv[]) {
             }
         }
     } else {
-        for (int i = 0; i < training_instances * training_features; i += VSIZE) {
-            _vim2K_fmovs(1.0, &tr_base[i]);
-        }    
-        for (int i = 0; i < test_instances * training_features; i += VSIZE) {
-            _vim2K_fmovs(1.0, &te_base[i]);
+        // for (int i = 0; i < training_instances * training_features; i += VSIZE) {
+        //     _vim2K_fmovs(1.0, &tr_base[i]);
+        // }    
+        // for (int i = 0; i < test_instances * training_features; i += VSIZE) {
+        //     _vim2K_fmovs(1.0, &te_base[i]);
+        // }
+        for (int i = 0; i < training_instances * training_features; i += 4) {
+            tr_base[i] = 0.5;
+            tr_base[i + 1] = 1.0;
+            tr_base[i + 2] = 1.5;
+            tr_base[i + 3] = 2.0;
         }
+        for (int i = 0; i < test_instances * training_features; i += 4) {
+            te_base[i] = 3.5;
+            te_base[i + 1] = 3.0;
+            te_base[i + 2] = 2.5;
+            te_base[i + 3] = 2.0;
+        }       
         for (i = 0; i < training_instances; ++i) {
             _vim2K_fmuls(&tr_base[i * training_features], mask, temp_train);
             for (j = 0; j < test_instances; ++j) {
@@ -128,7 +152,9 @@ void classification(char const *argv[]) {
     }
     for (i = 0; i < test_instances * training_instances; ++i) {
         e_distance[i] = sqrt(e_distance[i]);
+        printf("%f ", e_distance[i]);
     }
+    printf("\n\n");
     class_begin = clock();
     for (i = 0; i < test_instances * training_instances; i += training_instances) {
         get_ksmallest(&e_distance[i], tr_label, knn, k_neighbors);
