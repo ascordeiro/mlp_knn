@@ -1,7 +1,7 @@
 #include "knn.h"
 
 void read_files(char const *argv[]) {
-    read_begin = clock();
+    // read_begin = clock();
     vector_size = atoi(argv[1]);
     if (vector_size == 256) {
         VSIZE = VM64I;
@@ -19,14 +19,11 @@ void read_files(char const *argv[]) {
     }
 
     tr_base_size = (training_instances * training_features) + VSIZE;
-    // tr_base = (__v32f *)malloc(tr_base_size * sizeof(__v32f));
-    // tr_label = (__v32u *)malloc(label_instances * VSIZE * sizeof(__v32u));
-
     tr_base = (__v32f *)aligned_alloc(vector_size, sizeof(__v32f) * tr_base_size);
     tr_label = (__v32u *)aligned_alloc(vector_size, sizeof(__v32u)*training_instances);
 
-    read_end = clock();
-    read_spent = (double)(read_end - read_begin) / CLOCKS_PER_SEC;
+    // read_end = clock();
+    // read_spent = (double)(read_end - read_begin) / CLOCKS_PER_SEC;
 }
 
 void votes(__v32u *knn, int k) {
@@ -80,24 +77,12 @@ void classification(char const *argv[]) {
 
     // ed_begin = clock();
     if (vector_size == 256) {
-        // for (int i = 0; i < training_instances * training_features; i += VSIZE) {
-        //     _vim64_fmovs(1.0, &tr_base[i]);
-        // }
-        // for (int i = 0; i < test_instances * training_features; i += VSIZE) {
-        //     _vim64_fmovs(1.0, &te_base[i]);
-        // }
-        for (int i = 0; i < training_instances * training_features; i += 4) {
-            tr_base[i] = 0.5;
-            tr_base[i + 1] = 1.0;
-            tr_base[i + 2] = 1.5;
-            tr_base[i + 3] = 2.0;
+        for (int i = 0; i < training_instances * training_features; i += VSIZE) {
+            _vim64_fmovs(1.0, &tr_base[i]);
         }
-        for (int i = 0; i < test_instances * training_features; i += 4) {
-            te_base[i] = 3.5;
-            te_base[i + 1] = 3.0;
-            te_base[i + 2] = 2.5;
-            te_base[i + 3] = 2.0;
-        }        
+        for (int i = 0; i < test_instances * training_features; i += VSIZE) {
+            _vim64_fmovs(1.0, &te_base[i]);
+        }    
         if (training_features < VSIZE) {
             for (i = 0; i < training_instances; ++i) {
                 _vim64_fmuls(&tr_base[i * training_features], mask, temp_train);
@@ -122,24 +107,12 @@ void classification(char const *argv[]) {
             }
         }
     } else {
-        // for (int i = 0; i < training_instances * training_features; i += VSIZE) {
-        //     _vim2K_fmovs(1.0, &tr_base[i]);
-        // }    
-        // for (int i = 0; i < test_instances * training_features; i += VSIZE) {
-        //     _vim2K_fmovs(1.0, &te_base[i]);
-        // }
-        for (int i = 0; i < training_instances * training_features; i += 4) {
-            tr_base[i] = 0.5;
-            tr_base[i + 1] = 1.0;
-            tr_base[i + 2] = 1.5;
-            tr_base[i + 3] = 2.0;
-        }
-        for (int i = 0; i < test_instances * training_features; i += 4) {
-            te_base[i] = 3.5;
-            te_base[i + 1] = 3.0;
-            te_base[i + 2] = 2.5;
-            te_base[i + 3] = 2.0;
-        }       
+        for (int i = 0; i < training_instances * training_features; i += VSIZE) {
+            _vim2K_fmovs(1.0, &tr_base[i]);
+        }    
+        for (int i = 0; i < test_instances * training_features; i += VSIZE) {
+            _vim2K_fmovs(1.0, &te_base[i]);
+        }      
         for (i = 0; i < training_instances; ++i) {
             _vim2K_fmuls(&tr_base[i * training_features], mask, temp_train);
             for (j = 0; j < test_instances; ++j) {
@@ -152,19 +125,17 @@ void classification(char const *argv[]) {
     }
     for (i = 0; i < test_instances * training_instances; ++i) {
         e_distance[i] = sqrt(e_distance[i]);
-        printf("%f ", e_distance[i]);
     }
-    printf("\n\n");
-    class_begin = clock();
+    // class_begin = clock();
     for (i = 0; i < test_instances * training_instances; i += training_instances) {
         get_ksmallest(&e_distance[i], tr_label, knn, k_neighbors);
         votes(knn, k_neighbors);
     }
-    class_end = clock();
-    class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
+    // class_end = clock();
+    // class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
 
-    ed_end = clock();
-    ed_spent = (double)(ed_end - ed_begin)/CLOCKS_PER_SEC;
+    // ed_end = clock();
+    // ed_spent = (double)(ed_end - ed_begin)/CLOCKS_PER_SEC;
 
     free(knn);
     free(e_distance);
@@ -173,7 +144,7 @@ void classification(char const *argv[]) {
 }
 
 int main(int argc, char const *argv[]) {
-    total_begin = clock();
+    // total_begin = clock();
 
     // Initialize train and test matrix
     read_files(argv);
@@ -181,15 +152,15 @@ int main(int argc, char const *argv[]) {
     // Calculates Euclidean Distance
     classification(argv);
 
-    total_end = clock();
-    total_spent = (double)(total_end - total_begin) / CLOCKS_PER_SEC;
-    printf("**************************************\n");
-    printf("* Execution time:          %fs *\n", total_spent);
-    printf(" ************************************\n");
-    printf("* Read time:               %fs *\n", read_spent);
-    printf("* Euclidean Distance time: %fs *\n", ed_spent);
-    printf("* Classification time:     %fs *\n", class_spent);
-    printf("**************************************\n");
+    // total_end = clock();
+    // total_spent = (double)(total_end - total_begin) / CLOCKS_PER_SEC;
+    // printf("**************************************\n");
+    // printf("* Execution time:          %fs *\n", total_spent);
+    // printf(" ************************************\n");
+    // printf("* Read time:               %fs *\n", read_spent);
+    // printf("* Euclidean Distance time: %fs *\n", ed_spent);
+    // printf("* Classification time:     %fs *\n", class_spent);
+    // printf("**************************************\n");
     free(tr_base);
     free(tr_label);
     return 0;
