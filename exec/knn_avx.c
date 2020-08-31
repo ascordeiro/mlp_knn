@@ -25,12 +25,10 @@ void votes(u_int32_t *knn, int k) {
             neg++;
         }
     }
-    if (test_instances -1 == 255) {
-        if (pos > neg) {
-            printf("%s\n", "pos");
-        } else {
-            printf("%s\n", "neg");
-        }
+    if (pos > neg) {
+        printf("%s\n", "pos");
+    } else {
+        printf("%s\n", "neg");
     }
 }
 
