@@ -6,7 +6,7 @@
 
 #define AVX_SIZE 16
 
-int training_instances, training_features, output_size, hidden_size;
+int instances, features, output_size, hidden_size;
 float *bias;
 
 clock_t total_begin, total_end, hidden_begin, hidden_end, output_begin, output_end, class_begin, class_end;

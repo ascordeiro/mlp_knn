@@ -21,23 +21,11 @@ __v32f *relu_layer() {
                 mask[i] = 1.0;
             }
             for (i = 0; i < instances; i += instance_size) {
-                // _vim64_fmovs(1.0, instance_vector);
-                for (j = 0; j < VSIZE; j += 4) {
-                    instance_vector[j] = 0.5;
-                    instance_vector[j + 1] = 1.0;
-                    instance_vector[j + 2] = 1.5;
-                    instance_vector[j + 3] = 2.0;
-                }
+                _vim64_fmovs(1.0, instance_vector);
                 for (j = 0; j < VSIZE; j += features * 2) {
                     _vim64_fmuls(&instance_vector[j], mask, temp_instance);
                     _vim64_fmuls(&instance_vector[j + features], mask, temp_instance2);
-                    // _vim64_fmovs(1.0, weights);
-                    for (k = 0; k < VSIZE; k += 4) {
-                        weights[k] = 3.5;
-                        weights[k + 1] = 3.0;
-                        weights[k + 2] = 2.5;
-                        weights[k + 3] = 2.0;
-                    }
+                    _vim64_fmovs(1.0, weights);
                     for (k = 0; k < features/2; ++k) {
                         _vim64_fmuls(&weights[k * features], mask, temp_weights);
                         _vim64_fmuls(&weights[(k * features) + (VSIZE/2)], mask, temp_weights2);
@@ -57,23 +45,11 @@ __v32f *relu_layer() {
                 mask[i] = 1.0;
             }
             for (i = 0; i < instances; i += instance_size) {
-                // _vim64_fmovs(1.0, instance_vector);
-                for (j = 0; j < VSIZE; j += 4) {
-                    instance_vector[j] = 0.5;
-                    instance_vector[j + 1] = 1.0;
-                    instance_vector[j + 2] = 1.5;
-                    instance_vector[j + 3] = 2.0;
-                }
+                _vim64_fmovs(1.0, instance_vector);
                 for (j = 0; j < VSIZE; j += features) {
                     _vim64_fmuls(&instance_vector[j], mask, temp_instance);
                     for (k = 0; k < (features * features/2)/VSIZE; ++k) {
-                        // _vim64_fmovs(1.0, weights);
-                        for (l = 0; l < VSIZE; l += 4) {
-                            weights[l] = 3.5;
-                            weights[l + 1] = 3.0;
-                            weights[l + 2] = 2.5;
-                            weights[l + 3] = 2.0;
-                        }
+                        _vim64_fmovs(1.0, weights);
                         for (l = 0; l < VSIZE; l += features) {
                             _vim64_fmuls(&weights[l], mask, temp_weights);
                             _vim64_fmuls(temp_instance, temp_weights, temp_weights);
@@ -85,20 +61,12 @@ __v32f *relu_layer() {
             free(mask);
         } else {
             for (i = 0; i < instances; ++i) {
-                // _vim64_fmovs(1.0, instance_vector);
-                for (j = 0; j < VSIZE; j += 4) {
-                    instance_vector[j] = 0.5;
-                    instance_vector[j + 1] = 1.0;
-                    instance_vector[j + 2] = 1.5;
-                    instance_vector[j + 3] = 2.0;
+                for (j = 0; j < n_vectors; ++j) {
+                    _vim64_fmovs(1.0, &instance_vector[j * VSIZE]);
                 }
                 for (j = 0; j < features/2; ++j) {
-                    // _vim64_fmovs(1.0, weights);
-                    for (l = 0; l < VSIZE; l += 4) {
-                        weights[l] = 3.5;
-                        weights[l + 1] = 3.0;
-                        weights[l + 2] = 2.5;
-                        weights[l + 3] = 2.0;
+                    for (k = 0; k < n_vectors; ++k) {
+                        _vim64_fmovs(1.0, &weights[k * VSIZE]);
                     }
                     for (k = 0; k < n_vectors; ++k) {
                         _vim64_fmuls(&instance_vector[k * VSIZE], &weights[k * VSIZE], temp_weights);
@@ -120,24 +88,12 @@ __v32f *relu_layer() {
                 mask[i] = 1.0;
             }
             for (i = 0; i < instances; i += instance_size) {
-                // _vim2K_fmovs(1.0, instance_vector);
-                for (j = 0; j < VSIZE; j += 4) {
-                    instance_vector[j] = 0.5;
-                    instance_vector[j + 1] = 1.0;
-                    instance_vector[j + 2] = 1.5;
-                    instance_vector[j + 3] = 2.0;
-                }
+                _vim2K_fmovs(1.0, instance_vector);
                 for (j = 0, jj = 0; j < VSIZE; j += features, jj += features) {
                     _vim2K_fmuls(&instance_vector[j], mask, temp_instance);
                     if (j % ((VSIZE/features) * 2) == 0) {
                         jj = 0;
-                        // _vim2K_fmovs(1.0, weights);
-                        for (l = 0; l < VSIZE; l += 4) {
-                            weights[l] = 3.5;
-                            weights[l + 1] = 3.0;
-                            weights[l + 2] = 2.5;
-                            weights[l + 3] = 2.0;
-                        }
+                        _vim2K_fmovs(1.0, weights);
                     }
                     for (k = (jj * (features/2)); k < (jj * (features/2)) + (features * (features/2)); k += features) {
                         _vim2K_fmuls(&weights[k], mask, temp_weights);
@@ -153,23 +109,11 @@ __v32f *relu_layer() {
                 mask[i] = 1.0;
             }
             for (i = 0; i < instances; i += instance_size) {
-                // _vim2K_fmovs(1.0, instance_vector);
-                for (j = 0; j < VSIZE; j += 4) {
-                    instance_vector[j] = 0.5;
-                    instance_vector[j + 1] = 1.0;
-                    instance_vector[j + 2] = 1.5;
-                    instance_vector[j + 3] = 2.0;
-                }
+                _vim2K_fmovs(1.0, instance_vector);
                 for (j = 0, jj = 0; j < VSIZE; j += features, jj += features) {
                     _vim2K_fmuls(&instance_vector[j], mask, temp_instance);
                     for (k = 0; k < (features * (features/2)/VSIZE); ++k) {
-                        // _vim2K_fmovs(1.0, weights);
-                        for (l = 0; l < VSIZE; l += 4) {
-                            weights[l] = 3.5;
-                            weights[l + 1] = 3.0;
-                            weights[l + 2] = 2.5;
-                            weights[l + 3] = 2.0;
-                        }
+                        _vim2K_fmovs(1.0, weights);
                         for (l = 0; l < VSIZE; l += features) {
                             _vim2K_fmuls(&weights[l], mask, temp_weights);
                             _vim2K_fmuls(temp_instance, temp_weights, temp_weights);
@@ -184,6 +128,11 @@ __v32f *relu_layer() {
         for (i = 0; i < hidden_size; i += VSIZE) {
             _vim2K_fadds(&hidden_layer[i], bias, &hidden_layer[i]);
         }
+    }
+        
+    for (i = 0; i < hidden_size; ++i) {
+        if (hidden_layer[i] < 0.0) 
+        hidden_layer[i] = 0.0;
     }
 
     free(instance_vector);
@@ -200,7 +149,7 @@ __v32f *softmax_layer(__v32f *hidden_layer) {
         o_size = VSIZE;
     }
 
-    __v32f *weights = (__v32f *)aligned_alloc(vector_size, (n_vectors * VSIZE * sizeof(__v32f)) + (VSIZE * sizeof(__v32f)));
+    __v32f *weights = (__v32f *)aligned_alloc(vector_size, (VSIZE * sizeof(__v32f)) + (VSIZE * sizeof(__v32f)));
     __v32f *temp_hidden = (__v32f *)aligned_alloc(vector_size, VSIZE * sizeof(__v32f));
     __v32f *temp_weights = (__v32f *)aligned_alloc(vector_size, VSIZE * sizeof(__v32f));
     __v32f *output_layer = (__v32f *)aligned_alloc(vector_size, o_size * sizeof(__v32f));
@@ -215,13 +164,7 @@ __v32f *softmax_layer(__v32f *hidden_layer) {
                 _vim64_fmuls(&hidden_layer[i], mask, temp_hidden);
                 if (i % (VSIZE/2) == 0) {
                     ii = 0;
-                    // _vim64_fmovs(1.0, weights);
-                    for (j = 0; j < VSIZE; j += 4) {
-                        weights[j] = 0.2;
-                        weights[j + 1] = 0.4;
-                        weights[j + 2] = 0.6;
-                        weights[j + 3] = 0.8;
-                    }
+                    _vim64_fmovs(1.0, weights);
                 }
                 for (j = 0; j < output_size; ++j) {
                     _vim64_fmuls(&weights[(ii * 2) + (j * (features/2))], mask, temp_weights);
@@ -231,19 +174,11 @@ __v32f *softmax_layer(__v32f *hidden_layer) {
             }
             free(mask);
         } else {
-            for (i = 0; i < hidden_size; i += VSIZE) {
-                // for (j = 0; j < n_vectors; ++j) {
-                //     _vim64_fmovs(1.0, &weights[j * VSIZE]);
-                // }
-                for (j = 0; j < VSIZE * n_vectors; j += 4) {
-                    weights[j] = 0.2;
-                    weights[j + 1] = 0.4;
-                    weights[j + 2] = 0.6;
-                    weights[j + 3] = 0.8;
-                }
+            for (i = 0; i < hidden_size; i += VSIZE * n_vectors/2) {
                 for (j = 0; j < output_size; ++j) {
-                    for (k = 0; k < (n_vectors/2); ++k) {
-                        _vim64_fmuls(&hidden_layer[i + (k * VSIZE)], &weights[(j * output_size * VSIZE) + (k * VSIZE)], temp_weights);
+                    for (k = 0; k < n_vectors/2; ++k) {
+                        _vim64_fmovs(1.0, weights);
+                        _vim64_fmuls(&hidden_layer[i + (k * VSIZE)], weights, temp_weights);
                         _vim64_fcums(temp_weights, &p_sum);
                         output_layer[o_idx] += p_sum;
                     }
@@ -263,13 +198,7 @@ __v32f *softmax_layer(__v32f *hidden_layer) {
             _vim2K_fmuls(&hidden_layer[i], mask, temp_hidden);
             if (i % (VSIZE/2) == 0) {
                 ii = 0;
-                // _vim2K_fmovs(1.0, weights);
-                for (j = 0; j < VSIZE; j += 4) {
-                    weights[j] = 0.2;
-                    weights[j + 1] = 0.4;
-                    weights[j + 2] = 0.6;
-                    weights[j + 3] = 0.8;
-                }
+                _vim2K_fmovs(1.0, weights);
             }
             for (j = 0; j < output_size; ++j) {
                 _vim2K_fmuls(&weights[(ii * 2) + (j * (features/2))], mask, temp_weights);
@@ -283,11 +212,6 @@ __v32f *softmax_layer(__v32f *hidden_layer) {
         }
     }
 
-    for (i = 0; i < o_size; ++i) {
-        printf("%f ", output_layer[i]);
-    }
-    printf("\n\n");
-    
     free(weights);
     free(temp_hidden);
     free(temp_weights);
