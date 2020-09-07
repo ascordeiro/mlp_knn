@@ -193,36 +193,36 @@ void classification(float *output_layer) {
 }
 
 int main(int argc, char const *argv[]) {
-    total_begin = clock();
+    // total_begin = clock();
 
     instances = atoi(argv[1]);
     features = atoi(argv[2]);
     output_size = atoi(argv[3]);
 
-    hidden_begin = clock();
+    // hidden_begin = clock();
     float *hidden_layer = relu_layer();
-    hidden_end = clock();
-    hidden_spent = (double)(hidden_end - hidden_begin) / CLOCKS_PER_SEC;
+    // hidden_end = clock();
+    // hidden_spent = (double)(hidden_end - hidden_begin) / CLOCKS_PER_SEC;
 
-    output_begin = clock();
+    // output_begin = clock();
     float *output_layer = softmax_layer(hidden_layer);
-    output_end = clock();
-    output_spent = (double)(output_end - output_begin) / CLOCKS_PER_SEC;
+    // output_end = clock();
+    // output_spent = (double)(output_end - output_begin) / CLOCKS_PER_SEC;
 
-    class_begin = clock();
+    // class_begin = clock();
     classification(output_layer);
-    class_end = clock();
-    class_spent = (double)(class_end - class_begin) / CLOCKS_PER_SEC;
+    // class_end = clock();
+    // class_spent = (double)(class_end - class_begin) / CLOCKS_PER_SEC;
 
-    total_end = clock();
-    total_spent = (double)(total_end - total_begin) / CLOCKS_PER_SEC;
-    printf("*************************************\n");
-    printf("* Execution time:         %fs *\n", total_spent);
-    printf(" ***********************************\n");
-    printf("* Input x Hidden layer:   %fs *\n", hidden_spent);
-    printf("* Hidden x Output layer:  %fs *\n", output_spent);
-    printf("* Classification time:    %fs *\n", class_spent);
-    printf("*************************************\n");
+    // total_end = clock();
+    // total_spent = (double)(total_end - total_begin) / CLOCKS_PER_SEC;
+    // printf("*************************************\n");
+    // printf("* Execution time:         %fs *\n", total_spent);
+    // printf(" ***********************************\n");
+    // printf("* Input x Hidden layer:   %fs *\n", hidden_spent);
+    // printf("* Hidden x Output layer:  %fs *\n", output_spent);
+    // printf("* Classification time:    %fs *\n", class_spent);
+    // printf("*************************************\n");
 
     free(hidden_layer);
     free(output_layer);
