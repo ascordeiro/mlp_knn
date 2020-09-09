@@ -49,7 +49,6 @@ float *relu_layer() {
                     hidden_layer[h_idx++] = _mm512_mask_reduce_add_ps(avx_mask[k], avx_weights);
                 }
             }
-            initialize_weights(h_weights, w_size);
         }
     } else {
         for (i = 0; i < instances; i++) {
@@ -64,7 +63,6 @@ float *relu_layer() {
                 }
                 h_idx++;
             }
-            initialize_weights(h_weights, w_size);
         }
     }
     h_idx = 0;
@@ -90,12 +88,15 @@ float *softmax_layer(float *hidden_layer) {
     float sum;
     int olayer_size = output_size * instances;
     int hlayer_size = features/2;
-    int oweights_size = features * instances;
+    int oweights_size = hlayer_size * output_size;
+    if (oweights_size < AVX_SIZE) {
+        oweights_size = AVX_SIZE;
+    }
     int n_vectors = hlayer_size/AVX_SIZE;
     float *output_layer = (float *)aligned_alloc(64, olayer_size * sizeof(float));
     float *o_weights = (float *)aligned_alloc(64, oweights_size * sizeof(float));
 
-    __m512 avx_hidden, avx_oweights, avx_output, avx_bias;
+    __m512 avx_hidden, avx_oweights, avx_output, avx_bias, avx_mul;
     __mmask16 avx_mask8[4] = {0xf000, 0xf00, 0xf0, 0xf};
     __mmask16 avx_mask16[2] = {0xff00, 0xff};
     avx_bias = _mm512_set1_ps((float)1.0);
@@ -103,33 +104,30 @@ float *softmax_layer(float *hidden_layer) {
     initialize_weights(o_weights, oweights_size);
 
     if (features == 8) {
+        avx_oweights = _mm512_setr_ps(o_weights[0], o_weights[1], o_weights[2], o_weights[3], o_weights[0], o_weights[1], 
+                                      o_weights[2], o_weights[3], o_weights[0], o_weights[1], o_weights[2], o_weights[3],
+                                      o_weights[0], o_weights[1], o_weights[2], o_weights[3]);
         for (i = 0; i < hidden_size; i += features) {
             avx_hidden = _mm512_setr_ps(hidden_layer[i], hidden_layer[i+1], hidden_layer[i+2], hidden_layer[i+3], 
                                         hidden_layer[i], hidden_layer[i+1], hidden_layer[i+2], hidden_layer[i+3],
                                         hidden_layer[i+4], hidden_layer[i+5], hidden_layer[i+6], hidden_layer[i+7],
                                         hidden_layer[i+4], hidden_layer[i+5], hidden_layer[i+6], hidden_layer[i+7]);
-            for (j = i * output_size; j < (i*output_size) + features; j += AVX_SIZE) {
-                avx_oweights = _mm512_load_ps(&o_weights[j]);
-                avx_oweights = _mm512_mul_ps(avx_hidden, avx_oweights);
-                for (k = 0; k < 4; k++) {
-                    output_layer[o_idx++] = _mm512_mask_reduce_add_ps(avx_mask8[k], avx_oweights);
-		        }
+            avx_mul = _mm512_mul_ps(avx_hidden, avx_oweights);
+            for (k = 0; k < 4; k++) {
+                output_layer[o_idx++] = _mm512_mask_reduce_add_ps(avx_mask8[k], avx_mul);
             }
         }
-
     } else if (features == 16) {
+        avx_oweights = _mm512_load_ps(o_weights);
         for (i = 0; i < hidden_size; i += hlayer_size) {
             avx_hidden = _mm512_setr_ps(hidden_layer[i], hidden_layer[i+1], hidden_layer[i+2], hidden_layer[i+3], 
                                         hidden_layer[i+4], hidden_layer[i+5], hidden_layer[i+6], hidden_layer[i+7], 
                                         hidden_layer[i], hidden_layer[i+1], hidden_layer[i+2], hidden_layer[i+3], 
                                         hidden_layer[i+4], hidden_layer[i+5], hidden_layer[i+6], hidden_layer[i+7]);
         }
-        for (j = i * output_size; j < (i*output_size) + hlayer_size; j += AVX_SIZE) {
-            avx_oweights = _mm512_load_ps(&o_weights[j]);
-            avx_oweights = _mm512_mul_ps(avx_hidden, avx_oweights);
-            for (k = 0; k < 2; k++) {
-                output_layer[o_idx++] = _mm512_mask_reduce_add_ps(avx_mask16[k], avx_oweights);
-            }
+        avx_mul = _mm512_mul_ps(avx_hidden, avx_oweights);
+        for (k = 0; k < 2; k++) {
+            output_layer[o_idx++] = _mm512_mask_reduce_add_ps(avx_mask16[k], avx_mul);
         }
     } else {
         for (i = 0; i < hidden_size; i += hlayer_size) {
@@ -137,7 +135,7 @@ float *softmax_layer(float *hidden_layer) {
                 sum = 0.0;
                 for (k = 0; k < n_vectors; k++) {
                     avx_hidden = _mm512_load_ps(&hidden_layer[i + k * AVX_SIZE]);
-                    avx_oweights = _mm512_load_ps(&o_weights[j + k * AVX_SIZE]);
+                    avx_oweights = _mm512_load_ps(&o_weights[k * AVX_SIZE]);
                     avx_oweights = _mm512_mul_ps(avx_hidden, avx_oweights);
                     output_layer[o_idx] += _mm512_reduce_add_ps(avx_oweights);
                 }
