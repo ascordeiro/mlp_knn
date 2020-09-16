@@ -65,12 +65,12 @@ void classification(char const *argv[]) {
 
     // ed_begin = clock();
     k_neighbors = atoi(argv[5]);
-    __v32f partial_sum = 0;
     __v32f *te_base = (__v32f *)aligned_alloc(vector_size, (n_vectors * VSIZE * sizeof(__v32f)) + (VSIZE * sizeof(__v32f)));
     __v32f *e_distance = (__v32f *)aligned_alloc(vector_size, sizeof(__v32f) * test_instances * training_instances);
     __v32u *knn = (__v32u *)aligned_alloc(vector_size, k_neighbors * sizeof(__v32u));
     __v32f *temp_test = (__v32f *)aligned_alloc(vector_size, sizeof(__v32f) * VSIZE);
     __v32f *temp_train = (__v32f *)aligned_alloc(vector_size, sizeof(__v32f) * VSIZE);
+    __v32f *partial_sum = (__v32f *)aligned_alloc(vector_size, sizeof(__v32f) * VSIZE);
 
     if (vector_size == 256) {
         for (int i = 0; i < training_instances * training_features; i += VSIZE) {
@@ -111,10 +111,9 @@ void classification(char const *argv[]) {
                     for (k = 0; k < n_vectors; ++k) {
                         _vim64_fsubs(&tr_base[(j * VSIZE * n_vectors) + (k * VSIZE)], &te_base[k * VSIZE], temp_test);
                         _vim64_fmuls(temp_test, temp_test, temp_test);
-                        _vim64_fcums(temp_test, &partial_sum);
-                        e_distance[ed_idx] += partial_sum;
+                        _vim64_fcums(temp_test, &partial_sum[k]);
                     }
-                    ed_idx++;
+                    _vim64_fcums(partial_sum, &e_distance[ed_idx++]);
                     // i_end = clock();
                     // printf("inst treino %d: %f \n", j ,(double)(i_end - i_begin) / CLOCKS_PER_SEC);
                 }
@@ -164,6 +163,7 @@ void classification(char const *argv[]) {
     // class_end = clock();
     // class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
 
+    free(partial_sum);
     free(knn);
     free(e_distance);
     free(te_base);

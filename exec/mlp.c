@@ -31,6 +31,7 @@ __v32f *relu_layer() {
     __v32f *temp_instance = (__v32f *)aligned_alloc(vector_size, (VSIZE * sizeof(__v32f)));
     __v32f *weights = (__v32f *)aligned_alloc(vector_size, (weight_size * sizeof(__v32f)) + (VSIZE * sizeof(__v32f)));
     __v32f *temp_weights = (__v32f *)aligned_alloc(vector_size, (VSIZE * sizeof(__v32f)));
+    __v32f *p_sum = (__v32f *)aligned_alloc(vector_size, (VSIZE * sizeof(__v32f)));
     __v32f *hidden_layer = (__v32f *)aligned_alloc(vector_size, (hidden_size *  sizeof(__v32f)) + (VSIZE * sizeof(__v32f)));
 
     bias = (__v32f *)aligned_alloc(vector_size, sizeof(__v32f) * VSIZE);
@@ -94,10 +95,9 @@ __v32f *relu_layer() {
                 for (j = 0; j < features/2; ++j) {
                     for (k = 0; k < n_vectors; ++k) {
                         _vim64_fmuls(&instance_vector[k * VSIZE], &weights[(j * features) + (k * VSIZE)], temp_weights);
-                        _vim64_fcums(temp_weights, &p_sum);
-                        hidden_layer[h_idx] += p_sum;
+                        _vim64_fcums(temp_weights, &p_sum[k]);
                     }
-                    ++h_idx;
+                    _vim64_fcums(p_sum, &hidden_layer[h_idx++]);
                 }
                 // hidden_end = clock();
                 // printf("instance %d: %f\n", i, (double)(hidden_end - hidden_begin) / CLOCKS_PER_SEC);
@@ -142,6 +142,7 @@ __v32f *relu_layer() {
         hidden_layer[i] = 0.0;
     }
 
+    free(p_sum);
     free(instance_vector);
     free(temp_instance);
     free(weights);
@@ -159,6 +160,7 @@ __v32f *softmax_layer(__v32f *hidden_layer) {
     __v32f *weights = (__v32f *)aligned_alloc(vector_size, (VSIZE * n_vectors/2 * sizeof(__v32f)) + (VSIZE * sizeof(__v32f)));
     __v32f *temp_hidden = (__v32f *)aligned_alloc(vector_size, VSIZE * sizeof(__v32f));
     __v32f *temp_weights = (__v32f *)aligned_alloc(vector_size, VSIZE * sizeof(__v32f));
+    __v32f *p_sum = (__v32f *)aligned_alloc(vector_size, VSIZE * sizeof(__v32f));
     __v32f *output_layer = (__v32f *)aligned_alloc(vector_size, o_size * sizeof(__v32f));
 
     if(vector_size == 256) {
@@ -187,10 +189,9 @@ __v32f *softmax_layer(__v32f *hidden_layer) {
                 for (j = 0; j < output_size; ++j) {
                     for (k = 0; k < n_vectors/2; ++k) {
                         _vim64_fmuls(&hidden_layer[i + (k * VSIZE)], weights, temp_weights);
-                        _vim64_fcums(temp_weights, &p_sum);
-                        output_layer[o_idx] += p_sum;
+                        _vim64_fcums(temp_weights, &p_sum[k]);
                     }
-                    ++o_idx;
+                    _vim64_fcums(p_sum, &output_layer[o_idx]);
                 }
             }
         }
@@ -222,6 +223,7 @@ __v32f *softmax_layer(__v32f *hidden_layer) {
         }
     }
 
+    free(p_sum);
     free(weights);
     free(temp_hidden);
     free(temp_weights);
