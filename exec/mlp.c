@@ -111,25 +111,43 @@ __v32f *relu_layer() {
         for (i = 0; i < weight_size; i += VSIZE) {
             _vim2K_fmovs(1.0, weights);
         }
-        mask = (__v32f *)aligned_alloc(vector_size, VSIZE * sizeof(__v32f));
-        for (i = 0; i < features; ++i) {
-            mask[i] = 1.0;
-        }
-        for (i = 0; i < instances; i += instance_size) {
-            // hidden_begin = clock();
-            _vim2K_fmovs(1.0, instance_vector);
-            for (j = 0; j < VSIZE; j += features) {
-                _vim2K_fmuls(&instance_vector[j], mask, temp_instance);
-                for (k = 0; k < features/2; ++k) {
-                    _vim2K_fmuls(&weights[(k * features)], mask, temp_weights);
-                    _vim2K_fmuls(temp_instance, temp_weights, temp_weights);
-                    _vim2K_fcums(temp_weights, &hidden_layer[h_idx++]);
-                }
+        if (features < VSIZE) {
+            mask = (__v32f *)aligned_alloc(vector_size, VSIZE * sizeof(__v32f));
+            for (i = 0; i < features; ++i) {
+                mask[i] = 1.0;
             }
-            // hidden_end = clock();
-            // printf("vector %d: %f\n", i, (double)(hidden_end - hidden_begin) / CLOCKS_PER_SEC);
+            for (i = 0; i < instances; i += instance_size) {
+                // hidden_begin = clock();
+                _vim2K_fmovs(1.0, instance_vector);
+                for (j = 0; j < VSIZE; j += features) {
+                    _vim2K_fmuls(&instance_vector[j], mask, temp_instance);
+                    for (k = 0; k < features/2; ++k) {
+                        _vim2K_fmuls(&weights[(k * features)], mask, temp_weights);
+                        _vim2K_fmuls(temp_instance, temp_weights, temp_weights);
+                        _vim2K_fcums(temp_weights, &hidden_layer[h_idx++]);
+                    }
+                }
+                // hidden_end = clock();
+                // printf("vector %d: %f\n", i, (double)(hidden_end - hidden_begin) / CLOCKS_PER_SEC);
+            }
+            free(mask);
+        } else {
+            for (i = 0; i < instances; ++i) {
+                // hidden_begin = clock();
+                for (j = 0; j < n_vectors; ++j) {
+                    _vim2K_fmovs(1.0, &instance_vector[j * VSIZE]);
+                }
+                for (j = 0; j < features/2; ++j) {
+                    for (k = 0; k < n_vectors; ++k) {
+                        _vim2K_fmuls(&instance_vector[k * VSIZE], &weights[(j * features) + (k * VSIZE)], temp_weights);
+                        _vim2K_fcums(temp_weights, &p_sum[k]);
+                    }
+                    _vim2K_fcums(p_sum, &hidden_layer[h_idx++]);
+                }
+                // hidden_end = clock();
+                // printf("instance %d: %f\n", i, (double)(hidden_end - hidden_begin) / CLOCKS_PER_SEC);
+            }
         }
-        free(mask);
 
         _vim2K_fmovs(1.0, bias);
         for (i = 0; i < hidden_size; i += VSIZE) {
@@ -199,25 +217,37 @@ __v32f *softmax_layer(__v32f *hidden_layer) {
             _vim64_fadds(&output_layer[i], bias, &output_layer[i]);
         }
     } else {
-        __v32f *mask = (__v32f *)aligned_alloc(vector_size, sizeof(__v32f) * n_vectors * VSIZE);
-        for (i = 0; i < features/2; ++i) {
-            mask[i] = 1.0;
-        }
-        for (i = 0; i < n_vectors/2; ++i) {
-            _vim2K_fmovs(1.0, weights);
-        } 
-        for (i = 0, ii = 0; i < hidden_size; i += features/2, ii += features/2) {
-            _vim2K_fmuls(&hidden_layer[i], mask, temp_hidden);
-            if (i % (VSIZE/2) == 0) {
-                ii = 0;
+        if (features < VSIZE) {
+            __v32f *mask = (__v32f *)aligned_alloc(vector_size, sizeof(__v32f) * n_vectors * VSIZE);
+            for (i = 0; i < features/2; ++i) {
+                mask[i] = 1.0;
             }
-            for (j = 0; j < output_size; ++j) {
-                _vim2K_fmuls(&weights[(ii * 2) + (j * (features/2))], mask, temp_weights);
-                _vim2K_fmuls(temp_hidden, temp_weights, temp_weights);
-                _vim2K_fcums(temp_weights, &output_layer[o_idx++]);
+            for (i = 0; i < n_vectors/2; ++i) {
+                _vim2K_fmovs(1.0, weights);
+            } 
+            for (i = 0, ii = 0; i < hidden_size; i += features/2, ii += features/2) {
+                _vim2K_fmuls(&hidden_layer[i], mask, temp_hidden);
+                if (i % (VSIZE/2) == 0) {
+                    ii = 0;
+                }
+                for (j = 0; j < output_size; ++j) {
+                    _vim2K_fmuls(&weights[(ii * 2) + (j * (features/2))], mask, temp_weights);
+                    _vim2K_fmuls(temp_hidden, temp_weights, temp_weights);
+                    _vim2K_fcums(temp_weights, &output_layer[o_idx++]);
+                }
+            }
+            free(mask);
+        } else {
+            for (i = 0; i < hidden_size; i += VSIZE * n_vectors/2) {
+                for (j = 0; j < output_size; ++j) {
+                    for (k = 0; k < n_vectors/2; ++k) {
+                        _vim2K_fmuls(&hidden_layer[i + (k * VSIZE)], weights, temp_weights);
+                        _vim2K_fcums(temp_weights, &p_sum[k]);
+                    }
+                    _vim2K_fcums(p_sum, &output_layer[o_idx]);
+                }
             }
         }
-        free(mask);
         for (i = 0; i < o_size; i += VSIZE) {
             _vim2K_fadds(&output_layer[i], bias, &output_layer[i]);
         }

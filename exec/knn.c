@@ -122,32 +122,54 @@ void classification(char const *argv[]) {
             }
         }
     } else {
-        __v32f *mask = (__v32f *)aligned_alloc(vector_size, sizeof(__v32f) * VSIZE);
-        for (i = 0; i < training_features; ++i) {
-            mask[i] = 1.0;
-        }
-        for (int i = 0; i < training_instances * training_features; i += VSIZE) {
-            _vim2K_fmovs(1.0, &tr_base[i]);
-        }    
-        for (i = 0; i < test_instances; i += n_instances) {
-            // inst_begin = clock();
-            _vim2K_fmovs(0.5, te_base);
-            for (j = 0; j < training_instances; ++j) {
-                // i_begin =clock();
-                _vim2K_fmuls(&tr_base[j* training_features], mask, temp_train);
-                for (k = 0; k < n_instances; ++k) {
-                    _vim2K_fmuls(&te_base[k * training_features], mask, temp_test);
-                    _vim2K_fsubs(temp_train, temp_test, temp_test);
-                    _vim2K_fmuls(temp_test, temp_test, temp_test);
-                    _vim2K_fcums(temp_test, &e_distance[ed_idx++]);
-                }
-                // i_end = clock();
-                // printf("inst treino %d: %f \n", j, (double)(i_end - i_begin) / CLOCKS_PER_SEC);
+        if (training_features < VSIZE) {
+            __v32f *mask = (__v32f *)aligned_alloc(vector_size, sizeof(__v32f) * VSIZE);
+            for (i = 0; i < training_features; ++i) {
+                mask[i] = 1.0;
             }
-            // inst_end = clock();
-            // printf("teste vector %d: %f \n", i, (double)(inst_end - inst_begin) / CLOCKS_PER_SEC);
+            for (int i = 0; i < training_instances * training_features; i += VSIZE) {
+                _vim2K_fmovs(1.0, &tr_base[i]);
+            }    
+            for (i = 0; i < test_instances; i += n_instances) {
+                // inst_begin = clock();
+                _vim2K_fmovs(0.5, te_base);
+                for (j = 0; j < training_instances; ++j) {
+                    // i_begin =clock();
+                    _vim2K_fmuls(&tr_base[j* training_features], mask, temp_train);
+                    for (k = 0; k < n_instances; ++k) {
+                        _vim2K_fmuls(&te_base[k * training_features], mask, temp_test);
+                        _vim2K_fsubs(temp_train, temp_test, temp_test);
+                        _vim2K_fmuls(temp_test, temp_test, temp_test);
+                        _vim2K_fcums(temp_test, &e_distance[ed_idx++]);
+                    }
+                    // i_end = clock();
+                    // printf("inst treino %d: %f \n", j, (double)(i_end - i_begin) / CLOCKS_PER_SEC);
+                }
+                // inst_end = clock();
+                // printf("teste vector %d: %f \n", i, (double)(inst_end - inst_begin) / CLOCKS_PER_SEC);
+            }
+            free(mask);
+        } else {
+            for (i = 0; i < test_instances; ++i) {
+                // inst_begin = clock();
+                for (j = 0; j < n_vectors; ++j) {
+                    _vim2K_fmovs(0.5, &te_base[j * VSIZE]);
+                }
+                for (j = 0; j < training_instances; ++j) {
+                    // i_begin =clock();
+                    for (k = 0; k < n_vectors; ++k) {
+                        _vim2K_fsubs(&tr_base[(j * VSIZE * n_vectors) + (k * VSIZE)], &te_base[k * VSIZE], temp_test);
+                        _vim2K_fmuls(temp_test, temp_test, temp_test);
+                        _vim2K_fcums(temp_test, &partial_sum[k]);
+                    }
+                    _vim2K_fcums(partial_sum, &e_distance[ed_idx++]);
+                    // i_end = clock();
+                    // printf("inst treino %d: %f \n", j ,(double)(i_end - i_begin) / CLOCKS_PER_SEC);
+                }
+                // inst_end = clock();
+                // printf("inst teste %d: %f \n", i, (double)(inst_end - inst_begin) / CLOCKS_PER_SEC);
+            }
         }
-        free(mask);
     }
     for (i = 0; i < test_instances * training_instances; ++i) {
         e_distance[i] = sqrt(e_distance[i]);
