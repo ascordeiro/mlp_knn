@@ -27,22 +27,22 @@ __v32f *relu_layer() {
     }
 
     __v32f *mask;
-    __v32f *instance_vector = (__v32f *)aligned_alloc(vector_size, (instance_size * sizeof(__v32f)) + (VSIZE * sizeof(__v32f)));
-    __v32f *temp_instance = (__v32f *)aligned_alloc(vector_size, (VSIZE * sizeof(__v32f)));
-    __v32f *weights = (__v32f *)aligned_alloc(vector_size, (weight_size * sizeof(__v32f)) + (VSIZE * sizeof(__v32f)));
-    __v32f *temp_weights = (__v32f *)aligned_alloc(vector_size, (VSIZE * sizeof(__v32f)));
-    __v32f *p_sum = (__v32f *)aligned_alloc(vector_size, (VSIZE * sizeof(__v32f)));
-    __v32f *hidden_layer = (__v32f *)aligned_alloc(vector_size, (hidden_size *  sizeof(__v32f)) + (VSIZE * sizeof(__v32f)));
+    __v32f *instance_vector = (__v32f *)aligned_alloc(alignment, (instance_size * features * sizeof(__v32f)) + (VSIZE * sizeof(__v32f)));
+    __v32f *temp_instance = (__v32f *)aligned_alloc(alignment, (VSIZE * sizeof(__v32f)));
+    __v32f *weights = (__v32f *)aligned_alloc(alignment, (weight_size * sizeof(__v32f)) + (VSIZE * sizeof(__v32f)));
+    __v32f *temp_weights = (__v32f *)aligned_alloc(alignment, (VSIZE * sizeof(__v32f)));
+    __v32f *p_sum = (__v32f *)aligned_alloc(alignment, (VSIZE * sizeof(__v32f)));
+    __v32f *hidden_layer = (__v32f *)aligned_alloc(alignment, (hidden_size *  sizeof(__v32f)) + (VSIZE * sizeof(__v32f)));
 
-    bias = (__v32f *)aligned_alloc(vector_size, sizeof(__v32f) * VSIZE);
+    bias = (__v32f *)aligned_alloc(alignment, sizeof(__v32f) * VSIZE);
     if (vector_size == 256) {
         for (i = 0; i < weight_size; i += VSIZE) {
             _vim64_fmovs(1.0, weights);
         }
         if (features == 8) {
-            __v32f *temp_instance2 = (__v32f *)aligned_alloc(vector_size, (VSIZE * sizeof(__v32f)));
-            __v32f *temp_weights2 = (__v32f *)aligned_alloc(vector_size, (VSIZE * sizeof(__v32f)));
-            mask = (__v32f *)aligned_alloc(vector_size, VSIZE * sizeof(__v32f));
+            __v32f *temp_instance2 = (__v32f *)aligned_alloc(alignment, (VSIZE * sizeof(__v32f)));
+            __v32f *temp_weights2 = (__v32f *)aligned_alloc(alignment, (VSIZE * sizeof(__v32f)));
+            mask = (__v32f *)aligned_alloc(alignment, VSIZE * sizeof(__v32f));
             for (i = 0; i < features; ++i) {
                 mask[i] = 1.0;
             }
@@ -67,7 +67,7 @@ __v32f *relu_layer() {
             free(temp_instance2);
             free(temp_weights2);
         } else if (features == 16 || features == 32) {
-            mask = (__v32f *)aligned_alloc(vector_size, VSIZE * sizeof(__v32f));
+            mask = (__v32f *)aligned_alloc(alignment, VSIZE * sizeof(__v32f));
             for (i = 0; i < features; ++i) {
                 mask[i] = 1.0;
             }
@@ -112,7 +112,7 @@ __v32f *relu_layer() {
             _vim2K_fmovs(1.0, weights);
         }
         if (features < VSIZE) {
-            mask = (__v32f *)aligned_alloc(vector_size, VSIZE * sizeof(__v32f));
+            mask = (__v32f *)aligned_alloc(alignment, VSIZE * sizeof(__v32f));
             for (i = 0; i < features; ++i) {
                 mask[i] = 1.0;
             }
@@ -175,18 +175,18 @@ __v32f *softmax_layer(__v32f *hidden_layer) {
         o_size = VSIZE;
     }
 
-    __v32f *weights = (__v32f *)aligned_alloc(vector_size, (VSIZE * n_vectors/2 * sizeof(__v32f)) + (VSIZE * sizeof(__v32f)));
-    __v32f *temp_hidden = (__v32f *)aligned_alloc(vector_size, VSIZE * sizeof(__v32f));
-    __v32f *temp_weights = (__v32f *)aligned_alloc(vector_size, VSIZE * sizeof(__v32f));
-    __v32f *p_sum = (__v32f *)aligned_alloc(vector_size, VSIZE * sizeof(__v32f));
-    __v32f *output_layer = (__v32f *)aligned_alloc(vector_size, o_size * sizeof(__v32f));
+    __v32f *weights = (__v32f *)aligned_alloc(alignment, (VSIZE * n_vectors/2 * sizeof(__v32f)) + (VSIZE * sizeof(__v32f)));
+    __v32f *temp_hidden = (__v32f *)aligned_alloc(alignment, VSIZE * sizeof(__v32f));
+    __v32f *temp_weights = (__v32f *)aligned_alloc(alignment, VSIZE * sizeof(__v32f));
+    __v32f *p_sum = (__v32f *)aligned_alloc(alignment, VSIZE * sizeof(__v32f));
+    __v32f *output_layer = (__v32f *)aligned_alloc(alignment, o_size * sizeof(__v32f));
 
     if(vector_size == 256) {
         for (i = 0; i < n_vectors/2; ++i) {
             _vim64_fmovs(1.0, weights);
         }
         if (features < 128) {
-        __v32f *mask = (__v32f *)aligned_alloc(vector_size, sizeof(__v32f) * n_vectors * VSIZE);
+        __v32f *mask = (__v32f *)aligned_alloc(alignment, sizeof(__v32f) * n_vectors * VSIZE);
         for (i = 0; i < features/2; ++i) {
             mask[i] = 1.0;
         }
@@ -218,7 +218,7 @@ __v32f *softmax_layer(__v32f *hidden_layer) {
         }
     } else {
         if (features < VSIZE) {
-            __v32f *mask = (__v32f *)aligned_alloc(vector_size, sizeof(__v32f) * n_vectors * VSIZE);
+            __v32f *mask = (__v32f *)aligned_alloc(alignment, sizeof(__v32f) * n_vectors * VSIZE);
             for (i = 0; i < features/2; ++i) {
                 mask[i] = 1.0;
             }
@@ -262,7 +262,7 @@ __v32f *softmax_layer(__v32f *hidden_layer) {
 
 void classification(__v32f *output_layer) {
     __v32f sum_exp;
-    __v32f *result = (__v32f *)aligned_alloc(vector_size, sizeof(__v32f) * output_size);
+    __v32f *result = (__v32f *)aligned_alloc(alignment, sizeof(__v32f) * output_size);
 
     for (int i = 0; i < instances; ++i) {
         sum_exp = 0.0;
@@ -290,13 +290,15 @@ int main(int argc, char const *argv[]) {
     output_size = atoi(argv[4]);
 
     if (vector_size == 256) {
+        alignment = 256;
         VSIZE = VM64I;
     } else {
+        alignment = 8192;
         VSIZE = VM2KI;
     }
 
     n_vectors = features/VSIZE;
-    instance_size = n_vectors * VSIZE;
+    instance_size = 1;
     if (features < VSIZE) {
         n_vectors = 1;
         instance_size = VSIZE/features;
