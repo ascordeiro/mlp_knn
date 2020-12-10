@@ -33,6 +33,7 @@ __v32f *relu_layer() {
     __v32f *temp_weights = (__v32f *)aligned_alloc(alignment, (VSIZE * sizeof(__v32f)));
     __v32f *p_sum = (__v32f *)aligned_alloc(alignment, (VSIZE * sizeof(__v32f)));
     __v32f *hidden_layer = (__v32f *)aligned_alloc(alignment, (hidden_size *  sizeof(__v32f)) + (VSIZE * sizeof(__v32f)));
+    __v32f *relu_aux = (__v32f *)aligned_alloc(alignment, (VSIZE * sizeof(__v32f)));
 
     bias = (__v32f *)aligned_alloc(alignment, sizeof(__v32f) * VSIZE);
     if (vector_size == 256) {
@@ -104,8 +105,12 @@ __v32f *relu_layer() {
             }
         }
         _vim64_fmovs(1.0, bias);
+        _vim64_fmovs(0.0, relu_aux);
         for (i = 0; i < hidden_size; i += VSIZE) {
             _vim64_fadds(&hidden_layer[i], bias, &hidden_layer[i]);
+        }
+        for (i = 0; i < hidden_size; i += VSIZE) {
+            _vim64_fmaxs(&hidden_layer[i], relu_aux, &hidden_layer[i]);
         }
     } else {
         for (i = 0; i < weight_size; i += VSIZE) {
@@ -150,16 +155,15 @@ __v32f *relu_layer() {
         }
 
         _vim2K_fmovs(1.0, bias);
+        _vim2K_fmovs(0.0, relu_aux);
         for (i = 0; i < hidden_size; i += VSIZE) {
             _vim2K_fadds(&hidden_layer[i], bias, &hidden_layer[i]);
         }
+        for (i = 0; i < hidden_size; i += VSIZE) {
+            _vim2K_fmaxs(&hidden_layer[i], relu_aux, &hidden_layer[i]);
+        }
     }
-        
-    for (i = 0; i < hidden_size; ++i) {
-        if (hidden_layer[i] < 0.0) 
-        hidden_layer[i] = 0.0;
-    }
-
+      
     free(p_sum);
     free(instance_vector);
     free(temp_instance);
