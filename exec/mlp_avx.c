@@ -65,7 +65,7 @@ float *relu_layer() {
             }
         }
     }
-    h_idx = 0;
+
     for (i = 0; i < hidden_size; i += AVX_SIZE) {
         avx_phidden = _mm512_load_ps(&hidden_layer[i]);
         avx_phidden = _mm512_add_ps(avx_phidden, avx_bias);
@@ -75,7 +75,6 @@ float *relu_layer() {
             hidden_layer[j] = 0.0;
             }
         }
-	    h_idx += AVX_SIZE;
     }
 
     free(instance);
@@ -131,7 +130,6 @@ float *softmax_layer(float *hidden_layer) {
         }
     } else {
         for (i = 0; i < hidden_size; i += hlayer_size) {
-            for (j = i * output_size; j < (i * output_size) + features; j += hlayer_size) {
                 sum = 0.0;
                 for (k = 0; k < n_vectors; ++k) {
                     avx_hidden = _mm512_load_ps(&hidden_layer[i + k * AVX_SIZE]);
@@ -139,10 +137,11 @@ float *softmax_layer(float *hidden_layer) {
                     avx_oweights = _mm512_mul_ps(avx_hidden, avx_oweights);
                     output_layer[o_idx] += _mm512_reduce_add_ps(avx_oweights);
                 }
-                o_idx++;
+		o_idx++;
+		output_layer[o_idx++] = output_layer[o_idx - 1];
             }
-        }
     }
+
     for (i = 0; i < olayer_size; i += AVX_SIZE) {
         avx_output = _mm512_load_ps(&output_layer[i]);
         avx_output = _mm512_add_ps(avx_output, avx_bias);
@@ -170,6 +169,11 @@ void classification(float *output_layer) {
         }
     }
 
+//	for (int i = 0; i < instances; ++i) {
+//		printf("%f ", sum_exp[i]);
+//	}
+//	printf("\n");
+
     for (int i = 0, j = 0; i < instances; i += AVX_SIZE/2, j += AVX_SIZE) {
         avx_sumexp = _mm512_setr_ps(sum_exp[i], sum_exp[i], sum_exp[i+1], sum_exp[i+1], sum_exp[i+2], sum_exp[i+2], 
                                     sum_exp[i+3], sum_exp[i+3], sum_exp[i+4], sum_exp[i+4], sum_exp[i+5], sum_exp[i+5], 
@@ -191,7 +195,7 @@ void classification(float *output_layer) {
 }
 
 int main(int argc, char const *argv[]) {
-    // total_begin = clock();
+    total_begin = clock();
 
     instances = atoi(argv[1]);
     features = atoi(argv[2]);
@@ -212,10 +216,10 @@ int main(int argc, char const *argv[]) {
     // class_end = clock();
     // class_spent = (double)(class_end - class_begin) / CLOCKS_PER_SEC;
 
-    // total_end = clock();
-    // total_spent = (double)(total_end - total_begin) / CLOCKS_PER_SEC;
+     total_end = clock();
+     total_spent = (double)(total_end - total_begin) / CLOCKS_PER_SEC;
     // printf("*************************************\n");
-    // printf("* Execution time:         %fs *\n", total_spent);
+     printf("* Execution time:         %fs *\n", total_spent);
     // printf(" ***********************************\n");
     // printf("* Input x Hidden layer:   %fs *\n", hidden_spent);
     // printf("* Hidden x Output layer:  %fs *\n", output_spent);
@@ -223,6 +227,7 @@ int main(int argc, char const *argv[]) {
     // printf("*************************************\n");
 
     free(hidden_layer);
+
     free(output_layer);
     free(bias);
     return 0;
