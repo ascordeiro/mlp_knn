@@ -47,44 +47,43 @@ float *relu_layer() {
 
     if (features < AVX_SIZE) {
 
-	#pragma omp parallel private(i, j, k, avx_weights, avx_base)
-	{
-	#pragma omp for schedule(static)
-        for (i = 0; i < instances; ++i) {
-            read_instance(instance, features);
-            avx_base = _mm512_setr_ps(instance[0], instance[1], instance[2], instance[3], instance[4], instance[5], instance[6], instance[7], 
-                                      instance[0], instance[1], instance[2], instance[3], instance[4], instance[5], instance[6], instance[7]);
-             for (j = 0; j < w_size; j += AVX_SIZE) {
-                 avx_weights = _mm512_load_ps(&h_weights[j]);
-                 avx_weights = _mm512_mul_ps(avx_base, avx_weights);
-                 for (k = 0; k < 2; ++k) {
-		     #pragma omp critical
-		     hidden_layer[h_idx++] = _mm512_mask_reduce_add_ps(avx_mask[k], avx_weights);
+        #pragma omp parallel private(i, j, k, avx_weights, avx_base)
+        {
+            #pragma omp for schedule(static)
+                for (i = 0; i < instances; ++i) {
+                    read_instance(instance, features);
+                    avx_base = _mm512_setr_ps(instance[0], instance[1], instance[2], instance[3], instance[4], instance[5], instance[6], instance[7], 
+                                              instance[0], instance[1], instance[2], instance[3], instance[4], instance[5], instance[6], instance[7]);
+                    for (j = 0; j < w_size; j += AVX_SIZE) {
+                        avx_weights = _mm512_load_ps(&h_weights[j]);
+                        avx_weights = _mm512_mul_ps(avx_base, avx_weights);
+                        for (k = 0; k < 2; ++k) {
+                        #pragma omp critical
+                        hidden_layer[h_idx++] = _mm512_mask_reduce_add_ps(avx_mask[k], avx_weights);
+                    }
                 }
             }
         }
-	}
     } else {
-	#pragma omp parallel private(i, j, k, avx_base, avx_weights) reduction(+:sum)
-	{
-	    #pragma omp for schedule(static)
-	    for (i = 0; i < instances; ++i) {
-	        read_instance(instance, features);
+        #pragma omp parallel private(i, j, k, avx_base, avx_weights) reduction(+:sum)
+        {
+            #pragma omp for schedule(static)
+            for (i = 0; i < instances; ++i) {
+                read_instance(instance, features);
                 for (j = 0; j < w_size; j += features) {
                     sum = 0.0;
                     for (k = 0; k < n_vectors; ++k) {
-		        avx_base = _mm512_load_ps(&instance[k * AVX_SIZE]);
+                        avx_base = _mm512_load_ps(&instance[k * AVX_SIZE]);
                         avx_weights = _mm512_load_ps(&h_weights[j + k * AVX_SIZE]);
                         avx_weights = _mm512_mul_ps(avx_base, avx_weights);
                         sum += _mm512_reduce_add_ps(avx_weights);
                     }
-		     #pragma omp critical
-		     hidden_layer[h_idx++] = sum;
+                    #pragma omp critical
+                    hidden_layer[h_idx++] = sum;
                 }
-	    }
+            }
         }
     }
-
     #pragma omp parallel firstprivate(h_idx) private(i, j, avx_phidden)
     {
         #pragma omp for schedule(static, 16)
@@ -94,16 +93,11 @@ float *relu_layer() {
             _mm512_store_ps(&hidden_layer[i], avx_phidden);
             for (j = i; j < i + AVX_SIZE; ++j) {
                 if (hidden_layer[j] < 0.0) {
-                hidden_layer[j] = 0.0;
+                    hidden_layer[j] = 0.0;
                 }
             }
         }
     }
-
-//    for (int i = 0; i < hidden_size; ++i) {
-//	printf("%f ", hidden_layer[i]);
-//    }
-//    printf("\n");
 
     free(instance);
     free(h_weights);
@@ -135,36 +129,36 @@ float *softmax_layer(float *hidden_layer) {
                                       o_weights[6], o_weights[7], o_weights[0], o_weights[1], o_weights[2], o_weights[3],
                                       o_weights[4], o_weights[5], o_weights[6], o_weights[7]);
         #pragma omp parallel
-	{
-	#pragma omp for schedule(static) private(i, j, avx_hidden, avx_mul) 
-	 for (i = 0; i < hidden_size; i += features) {
-        avx_hidden = _mm512_setr_ps(hidden_layer[i], hidden_layer[i+1], hidden_layer[i+2], hidden_layer[i+3], 
-                                        hidden_layer[i], hidden_layer[i+1], hidden_layer[i+2], hidden_layer[i+3],
-                                        hidden_layer[i+4], hidden_layer[i+5], hidden_layer[i+6], hidden_layer[i+7],
-                                        hidden_layer[i+4], hidden_layer[i+5], hidden_layer[i+6], hidden_layer[i+7]);
-            avx_mul = _mm512_mul_ps(avx_hidden, avx_oweights);
-            for (j = 0; j < 4; ++j) {
-               #pragma omp critical 
-	       output_layer[o_idx++] = _mm512_mask_reduce_add_ps(avx_mask8[j], avx_mul);
+        {
+            #pragma omp for schedule(static) private(i, j, avx_hidden, avx_mul) 
+            for (i = 0; i < hidden_size; i += features) {
+                avx_hidden = _mm512_setr_ps(hidden_layer[i], hidden_layer[i+1], hidden_layer[i+2], hidden_layer[i+3], 
+                                            hidden_layer[i], hidden_layer[i+1], hidden_layer[i+2], hidden_layer[i+3],
+                                            hidden_layer[i+4], hidden_layer[i+5], hidden_layer[i+6], hidden_layer[i+7],
+                                            hidden_layer[i+4], hidden_layer[i+5], hidden_layer[i+6], hidden_layer[i+7]);
+                avx_mul = _mm512_mul_ps(avx_hidden, avx_oweights);
+                for (j = 0; j < 4; ++j) {
+                    #pragma omp critical 
+                    output_layer[o_idx++] = _mm512_mask_reduce_add_ps(avx_mask8[j], avx_mul);
+                }
             }
-	}
         }
     } else if (features == 16) {
         avx_oweights = _mm512_load_ps(o_weights);
         #pragma omp parallel private(i, j, avx_hidden, avx_mul)
-	{
-	#pragma omp for schedule(static)
-        for (i = 0; i < hidden_size; i += hlayer_size) {
-            avx_hidden = _mm512_setr_ps(hidden_layer[i], hidden_layer[i+1], hidden_layer[i+2], hidden_layer[i+3], 
-                                        hidden_layer[i+4], hidden_layer[i+5], hidden_layer[i+6], hidden_layer[i+7], 
-                                        hidden_layer[i], hidden_layer[i+1], hidden_layer[i+2], hidden_layer[i+3], 
-                                        hidden_layer[i+4], hidden_layer[i+5], hidden_layer[i+6], hidden_layer[i+7]);
-            avx_mul = _mm512_mul_ps(avx_hidden, avx_oweights);
-            for (j = 0; j < 2; ++j) {
-		#pragma omp critical
-                output_layer[o_idx++] = _mm512_mask_reduce_add_ps(avx_mask16[j], avx_mul);
+        {
+            #pragma omp for schedule(static)
+            for (i = 0; i < hidden_size; i += hlayer_size) {
+                avx_hidden = _mm512_setr_ps(hidden_layer[i], hidden_layer[i+1], hidden_layer[i+2], hidden_layer[i+3], 
+                                            hidden_layer[i+4], hidden_layer[i+5], hidden_layer[i+6], hidden_layer[i+7], 
+                                            hidden_layer[i], hidden_layer[i+1], hidden_layer[i+2], hidden_layer[i+3], 
+                                            hidden_layer[i+4], hidden_layer[i+5], hidden_layer[i+6], hidden_layer[i+7]);
+                avx_mul = _mm512_mul_ps(avx_hidden, avx_oweights);
+                for (j = 0; j < 2; ++j) {
+                    #pragma omp critical
+                    output_layer[o_idx++] = _mm512_mask_reduce_add_ps(avx_mask16[j], avx_mul);
+                }
             }
-	}
         }
     } else {
         #pragma omp parallel private(i, j, avx_hidden, avx_oweights) reduction(+:sum)
@@ -179,14 +173,14 @@ float *softmax_layer(float *hidden_layer) {
                     sum += _mm512_reduce_add_ps(avx_oweights);
                 }
                 output_layer[o_idx] = sum;
-		#pragma omp critical
-		o_idx += 2;
+		        #pragma omp critical
+		        o_idx += 2;
             }
 
-	    #pragma omp for schedule(static)
-	    for(int i = 0; i < olayer_size; i +=2) {
-		output_layer[i+1] = output_layer[i];
-	    }
+	        #pragma omp for schedule(static)
+	        for(int i = 0; i < olayer_size; i +=2) {
+		        output_layer[i+1] = output_layer[i];
+	        }
         }
     }
 
@@ -208,9 +202,9 @@ void classification(float *output_layer) {
     __m512 avx_sumexp, avx_output, avx_div;
     #pragma omp parallel for schedule(static, 16) private(avx_sumexp)
     for (int i = 0; i < instances; i += AVX_SIZE) {
-	avx_sumexp = _mm512_load_ps(&sum_exp[i]);
+	    avx_sumexp = _mm512_load_ps(&sum_exp[i]);
         avx_sumexp = _mm512_setzero_ps();
-	_mm512_store_ps(&sum_exp[i], avx_sumexp);
+	    _mm512_store_ps(&sum_exp[i], avx_sumexp);
     }
 
     #pragma omp parallel for collapse(2)
@@ -222,17 +216,17 @@ void classification(float *output_layer) {
 
     #pragma omp parallel
     {
-	int j = 0;
-	#pragma omp for schedule(static, 8) private(avx_sumexp, avx_output, avx_div)
-	for (int i = 0; i < instances; i += AVX_SIZE/2) {
-	    avx_sumexp = _mm512_setr_ps(sum_exp[i], sum_exp[i], sum_exp[i+1], sum_exp[i+1], sum_exp[i+2], sum_exp[i+2], 
-                                    sum_exp[i+3], sum_exp[i+3], sum_exp[i+4], sum_exp[i+4], sum_exp[i+5], sum_exp[i+5], 
-                                    sum_exp[i+6], sum_exp[i+6], sum_exp[i+7], sum_exp[i+7]);
-	    avx_output = _mm512_load_ps(&output_layer[j]);
-	    avx_div = _mm512_div_ps(avx_output, avx_sumexp);
-	    _mm512_store_ps(&result[j], avx_div);
-    	    j += AVX_SIZE;
-	}
+        int j = 0;
+        #pragma omp for schedule(static, 8) private(avx_sumexp, avx_output, avx_div)
+        for (int i = 0; i < instances; i += AVX_SIZE/2) {
+            avx_sumexp = _mm512_setr_ps(sum_exp[i], sum_exp[i], sum_exp[i+1], sum_exp[i+1], sum_exp[i+2], sum_exp[i+2], 
+                                        sum_exp[i+3], sum_exp[i+3], sum_exp[i+4], sum_exp[i+4], sum_exp[i+5], sum_exp[i+5], 
+                                        sum_exp[i+6], sum_exp[i+6], sum_exp[i+7], sum_exp[i+7]);
+            avx_output = _mm512_load_ps(&output_layer[j]);
+            avx_div = _mm512_div_ps(avx_output, avx_sumexp);
+            _mm512_store_ps(&result[j], avx_div);
+            j += AVX_SIZE;
+        }
     }
 
     for (int i = 0, j = 0; j < instances * output_size; ++i, j += output_size) {
