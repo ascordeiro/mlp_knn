@@ -3,7 +3,6 @@
 #include <math.h>
 #include <time.h>
 #include <immintrin.h>
-#include <omp.h>
 
 #define AVX_SIZE 16
 
