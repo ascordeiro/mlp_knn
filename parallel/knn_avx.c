@@ -32,17 +32,13 @@ void get_ksmallest(float *array, u_int32_t *label, u_int32_t *knn, int k) {
     }
 }
 
-void read_test_instance(float *base, int size, float x) {
-	#pragma omp parallel
-	{
-        __m512 avx_base;
-        #pragma omp for schedule(static, 16)
-        for(int i = 0; i < size; i += AVX_SIZE) {
-            avx_base = _mm512_load_ps(&base[i]);
-            avx_base = _mm512_set1_ps(x);
-            _mm512_store_ps(&base[i], avx_base);
-        }
-	}
+void read_instance(float *base, int size, float x) {
+    __m512 avx_base;
+    for(int i = 0; i < size; i += AVX_SIZE) {
+        avx_base = _mm512_load_ps(&base[i]);
+        avx_base = _mm512_set1_ps(x);
+        _mm512_store_ps(&base[i], avx_base);
+    }
 }
 
 // sqrt(pow((x1 - y1), 2) + pow((x2 - y2), 2) + ... + pow((xn - yn), 2))
@@ -64,16 +60,16 @@ void classification() {
 
     __m512 avx_tebase, avx_trbase, avx_psub, avx_pmul;
     // ed_begin = clock();
-    read_test_instance(tr_base, base_size, 1.0);
+    read_instance(tr_base, base_size, 1.0);
     if (training_features < AVX_SIZE) {
         __mmask16 avx_mask[2] = {0xff00, 0xff};
         // for each test instance
-		#pragma omp parallel private(avx_tebase, avx_trbase, avx_psub, avx_pmul)
+		#pragma omp parallel private(i, j, k, avx_tebase, avx_trbase, avx_psub, avx_pmul)
 		{
             #pragma omp for
             for (i = 0; i < test_instances; i++) {
                 ed_idx = 0;
-                read_test_instance(te_base, te_base_size, 0.5);
+                read_instance(te_base, te_base_size, 0.5);
                 avx_tebase = _mm512_setr_ps(te_base[0], te_base[1], te_base[2], te_base[3], te_base[4], te_base[5], te_base[6], te_base[7],
                                             te_base[0], te_base[1], te_base[2], te_base[3], te_base[4], te_base[5], te_base[6], te_base[7]);
 
@@ -90,12 +86,12 @@ void classification() {
     } else {
         int n_vector = training_features/AVX_SIZE;
 	    float sum;
-	    #pragma omp parallel private(avx_trbase, avx_tebase, avx_psub, avx_pmul)
+	    #pragma omp parallel private(i, j ,k, avx_trbase, avx_tebase, avx_psub, avx_pmul)
 	    {
             #pragma omp for schedule(static)
             for (i = 0; i < test_instances; i++) {
                 ed_idx = 0;
-                read_test_instance(te_base, te_base_size, 0.5);
+                read_instance(te_base, te_base_size, 0.5);
                 for (j = 0; j < base_size; j += training_features) {
                     sum = 0.0;
                     for (k = 0; k < n_vector; k++) {
@@ -122,7 +118,7 @@ void classification() {
     for (i = 0; i < test_instances; ++i) {
         // class_begin = clock();
         get_ksmallest(e_distance[i], tr_label, knn, k_neighbors);
-	printf("%d. ", i);
+	    printf("%d. ", i);
         votes(knn, k_neighbors);
         // class_end = clock();
         // class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
@@ -130,11 +126,7 @@ void classification() {
     // ed_end = clock();
     // ed_spent += (double)(ed_end - ed_begin) / CLOCKS_PER_SEC;
 
-
     free(knn);
-//    for (i = 0; i < test_instances; ++i) {
-//	free(e_distance[i]);
-  //  }
     free(e_distance);
     free(te_base);
 }
