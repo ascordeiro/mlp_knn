@@ -1,21 +1,5 @@
 #include "knn_avx.h"
 
-void read_files(char const *argv[]) {
-    // read_begin = clock();
-
-    training_instances = atoi(argv[1]);
-    test_instances = atoi(argv[2]);
-    training_features = atoi(argv[3]);
-
-    base_size = training_instances * training_features;
-
-    tr_base = (float *)aligned_alloc(64, sizeof(float) * base_size);
-    tr_label = (__uint32_t *)aligned_alloc(64, sizeof(__uint32_t)*training_instances);
-    
-    // read_end = clock();
-    // read_spent = (double)(read_end - read_begin) / CLOCKS_PER_SEC;
-}
-
 void votes(u_int32_t *knn, int k) {
     int i, pos = 0, neg = 0;
     for (i = 0; i < k; ++i) {
@@ -52,7 +36,7 @@ void read_test_instance(float *base, int size, float x) {
 	#pragma omp parallel
 	{
         __m512 avx_base;
-        #pragma omp for schedule(static)
+        #pragma omp for schedule(static, 16)
         for(int i = 0; i < size; i += AVX_SIZE) {
             avx_base = _mm512_load_ps(&base[i]);
             avx_base = _mm512_set1_ps(x);
@@ -62,11 +46,8 @@ void read_test_instance(float *base, int size, float x) {
 }
 
 // sqrt(pow((x1 - y1), 2) + pow((x2 - y2), 2) + ... + pow((xn - yn), 2))
-void classification(char const *argv[]) {
+void classification() {
     int i, j, k, ed_idx = 0;
-
-    k_neighbors = atoi(argv[4]);
-
     int te_base_size = training_features;
     int masks;
     if (training_features < AVX_SIZE) {
@@ -130,13 +111,18 @@ void classification(char const *argv[]) {
 	    }
     }
 
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for collapse(2) schedule(static)
     for (i = 0; i < test_instances; ++i) {
         for (j = 0; j < training_instances; ++j) {
             e_distance[i][j] = sqrt(e_distance[i][j]);
         }
+    }
+
+    #pragma omp parallel for schedule(static)
+    for (i = 0; i < test_instances; ++i) {
         // class_begin = clock();
         get_ksmallest(e_distance[i], tr_label, knn, k_neighbors);
+	printf("%d. ", i);
         votes(knn, k_neighbors);
         // class_end = clock();
         // class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
@@ -144,11 +130,11 @@ void classification(char const *argv[]) {
     // ed_end = clock();
     // ed_spent += (double)(ed_end - ed_begin) / CLOCKS_PER_SEC;
 
-    
+
     free(knn);
-    for (int i = 0; i < test_instances; ++i) {
-	    free(e_distance[i]);
-    }
+//    for (i = 0; i < test_instances; ++i) {
+//	free(e_distance[i]);
+  //  }
     free(e_distance);
     free(te_base);
 }
@@ -157,10 +143,18 @@ int main(int argc, char const *argv[]) {
     total_begin = clock();
 
     // Initialize train and test matrix
-    read_files(argv);
+    training_instances = atoi(argv[1]);
+    test_instances = atoi(argv[2]);
+    training_features = atoi(argv[3]);
+    k_neighbors = atoi(argv[4]);
+
+    base_size = training_instances * training_features;
+
+    tr_base = (float*)aligned_alloc(64, sizeof(float) * base_size);
+    tr_label = (__uint32_t*)aligned_alloc(64, sizeof(__uint32_t) * training_instances);
 
     // Calculates Euclidean Distance
-    classification(argv);
+    classification();
 
     total_end = clock();
     total_spent = (double)(total_end - total_begin) / CLOCKS_PER_SEC;
