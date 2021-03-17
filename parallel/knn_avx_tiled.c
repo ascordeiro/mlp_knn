@@ -43,7 +43,7 @@ void read_instance(float *base, int size, float x) {
 
 // sqrt(pow((x1 - y1), 2) + pow((x2 - y2), 2) + ... + pow((xn - yn), 2))
 void classification() {
-    int i, j, k, ed_idx = 0;
+    int i, j, k, l, ed_idx = 0;
     int te_base_size = training_features;
     int masks;
     if (training_features < AVX_SIZE) {
@@ -85,20 +85,20 @@ void classification() {
         }
     } else {
         int blocks = 0, cache_size = 16 * 1024 * 1024;
-        int training_size = training_instances * training_features * sizeof(float);
+        int training_size = base_size * sizeof(float);
         if (training_size > cache_size) {
             blocks = training_size / cache_size;
         }
         int n_vector = training_features/AVX_SIZE;
 	    float sum;
-	    #pragma omp parallel private(i, j ,k, avx_trbase, avx_tebase, avx_psub, avx_pmul)
+	    #pragma omp parallel private(i, j ,k, l, avx_trbase, avx_tebase, avx_psub, avx_pmul)
 	    {
             #pragma omp for schedule(static)
             for (i = 0; i < test_instances; i++) {
                 ed_idx = 0;
                 read_instance(te_base, te_base_size, 0.5);
-                for (j = 0; j < base_size; j += training_instances/blocks) {
-                    for (k = j; k < j + training_instances/blocks; k += training_features) {
+                for (j = 0; j < base_size; j += base_size/blocks) {
+                    for (k = j; k < j + base_size/blocks; k += training_features) {
                         sum = 0.0;
                         for (l = 0; l < n_vector; ++l) {
                             avx_trbase = _mm512_load_ps(&tr_base[k + l * AVX_SIZE]);
@@ -139,7 +139,7 @@ void classification() {
 }
 
 int main(int argc, char const *argv[]) {
-    total_begin = clock();
+    total_begin = omp_get_wtime();
 
     // Initialize train and test matrix
     training_instances = atoi(argv[1]);
@@ -155,8 +155,8 @@ int main(int argc, char const *argv[]) {
     // Calculates Euclidean Distance
     classification();
 
-    total_end = clock();
-    total_spent = (double)(total_end - total_begin) / CLOCKS_PER_SEC;
+    total_end = omp_get_wtime();
+    total_spent = (total_end - total_begin);
     // printf("**************************************\n");
     printf("* Execution time:          %fs *\n", total_spent);
     // printf(" ************************************\n");
