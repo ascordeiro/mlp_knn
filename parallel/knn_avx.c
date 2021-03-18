@@ -21,7 +21,6 @@ void get_ksmallest(float *array, u_int32_t *label, u_int32_t *knn, int k) {
     for (int i = 0; i < k; ++i) {
         knn[i] = 9999999;
         float min = array[0];
-	    // #pragma omp parallel for schedule(static)
         for (int j = 1; j < training_instances; ++j) {
             if (min > array[j]) {
                 idx = j;
@@ -59,11 +58,9 @@ void classification() {
     float *te_base = (float *)aligned_alloc(64, te_base_size * sizeof(float));
 
     __m512 avx_tebase, avx_trbase, avx_psub, avx_pmul;
-    // ed_begin = clock();
     read_instance(tr_base, base_size, 1.0);
     if (training_features < AVX_SIZE) {
         __mmask16 avx_mask[2] = {0xff00, 0xff};
-        // for each test instance
 		#pragma omp parallel private(i, j, k, avx_tebase, avx_trbase, avx_psub, avx_pmul)
 		{
             #pragma omp for
@@ -116,15 +113,10 @@ void classification() {
 
     #pragma omp parallel for schedule(static)
     for (i = 0; i < test_instances; ++i) {
-        // class_begin = clock();
         get_ksmallest(e_distance[i], tr_label, knn, k_neighbors);
 	    printf("%d. ", i);
         votes(knn, k_neighbors);
-        // class_end = clock();
-        // class_spent += (double)(class_end - class_begin) / CLOCKS_PER_SEC;
     }
-    // ed_end = clock();
-    // ed_spent += (double)(ed_end - ed_begin) / CLOCKS_PER_SEC;
 
     free(knn);
     free(e_distance);
@@ -132,7 +124,6 @@ void classification() {
 }
 
 int main(int argc, char const *argv[]) {
-    total_begin = clock();
 
     // Initialize train and test matrix
     training_instances = atoi(argv[1]);
@@ -148,15 +139,6 @@ int main(int argc, char const *argv[]) {
     // Calculates Euclidean Distance
     classification();
 
-    total_end = clock();
-    total_spent = (double)(total_end - total_begin) / CLOCKS_PER_SEC;
-    // printf("**************************************\n");
-    printf("* Execution time:          %fs *\n", total_spent);
-    // printf(" ************************************\n");
-    // printf("* Read time:               %fs *\n", read_spent);
-    // printf("* Euclidean Distance time: %fs *\n", ed_spent);
-    // printf("* Classification time:     %fs *\n", class_spent);
-    // printf("**************************************\n");
     free(tr_base);
     free(tr_label);
     return 0;
