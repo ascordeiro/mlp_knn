@@ -1,4 +1,4 @@
-]#!/bin/bash
+#!/bin/bash
 HOME="/home/ascordeiro"
 SIM_HOME=$HOME"/OrCS"
 PIN_HOME=$SIM_HOME"/trace_generator/pin"
@@ -16,10 +16,10 @@ do
             export OMP_WAIT_POLICY=passive
             for inst in 4096 #8192 16384 32768 65536 131072 262144
             do
-                for feat in 4096 8192 #8 16 32 64 128 256 512 1024 2048 
+                for feat in 4096 8192 #8 16 32 64 128 256 512 1024 2048
                 do
-                    echo $PIN_HOME -t $TRACER_HOME -trace x86 -output $CODE_HOME/traces/mlp_avx_${inst}i_${feat}f_${THREADS}t -threads ${THREADS} -- $CODE_HOME/exec/mlp_avx ${inst} ${feat} 2 &
-                done 
+                  nohup $PIN_HOME -t $TRACER_HOME -trace x86 -output $CODE_HOME/traces/mlp_avx_${inst}i_${feat}f_${THREADS}t -threads ${THREADS} -- $CODE_HOME/exec/mlp_avx ${inst} ${feat} 2 > nohup.out
+                done
             done
         ;;
         knn|KNN|kNN)
@@ -30,9 +30,9 @@ do
             do
                 for feat in 4096 8192 #8 16 32 64 128 256 512 1024 2048
                 do
-                    for k in 5 9 13
+                    for k in 9 #5 9 13
                     do
-                        echo $PIN_HOME -t $TRACER_HOME -trace x86 -output $CODE_HOME/traces/knn_avx_${inst}i_${feat}f_${THREADS}t -threads ${THREADS} -- $CODE_HOME/exec/knn_avx ${inst} 256 ${feat} ${k} &
+                       nohup $PIN_HOME -t $TRACER_HOME -trace x86 -output $CODE_HOME/traces/knn_avx_${inst}i_${feat}f_${k}k_${THREADS}t -threads ${THREADS} -- $CODE_HOME/exec/knn_avx ${inst} 256 ${feat} ${k} > nohup.out
                     done
                 done
             done
