@@ -148,7 +148,6 @@ void classification(char const *argv[]) {
     
     for (i = 0; i < test_instances * training_instances; i += training_instances) {
         get_ksmallest(&e_distance[i], tr_label, knn, k_neighbors);
-        printf("i. %d", i);
         votes(knn, k_neighbors);
     }
 
