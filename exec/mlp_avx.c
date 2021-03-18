@@ -33,7 +33,6 @@ float *relu_layer() {
     float *instance = (float *)aligned_alloc(64, features * sizeof(float));
     float *h_weights = (float *)aligned_alloc(64, w_size * sizeof(float));
     float *hidden_layer = (float *)aligned_alloc(64, hidden_size * sizeof(float));
-    float sum;
 
     initialize_weights(h_weights, w_size);
 
@@ -54,7 +53,6 @@ float *relu_layer() {
         for (i = 0; i < instances; ++i) {
             read_instance(instance, features);
             for (j = 0; j < w_size; j += features) {
-                sum = 0.0;
                 for (k = 0; k < n_vectors; ++k) {
                     avx_base = _mm512_load_ps(&instance[k * AVX_SIZE]);
                     avx_weights = _mm512_load_ps(&h_weights[j + k * AVX_SIZE]);
@@ -70,7 +68,7 @@ float *relu_layer() {
         avx_phidden = _mm512_load_ps(&hidden_layer[i]);
         avx_phidden = _mm512_add_ps(avx_phidden, avx_bias);
 	    _mm512_store_ps(&hidden_layer[i], avx_phidden);
-        for (j = i; j < AVX_SIZE; ++j) {
+        for (j = i; j < i + AVX_SIZE; ++j) {
             if (hidden_layer[j] < 0.0) {
             hidden_layer[j] = 0.0;
             }
@@ -84,7 +82,6 @@ float *relu_layer() {
 
 float *softmax_layer(float *hidden_layer) {
     int i, j, k, o_idx = 0;
-    float sum;
     int olayer_size = output_size * instances;
     int hlayer_size = features/2;
     int oweights_size = hlayer_size * output_size;
@@ -130,15 +127,14 @@ float *softmax_layer(float *hidden_layer) {
         }
     } else {
         for (i = 0; i < hidden_size; i += hlayer_size) {
-                sum = 0.0;
                 for (k = 0; k < n_vectors; ++k) {
                     avx_hidden = _mm512_load_ps(&hidden_layer[i + k * AVX_SIZE]);
                     avx_oweights = _mm512_load_ps(&o_weights[k * AVX_SIZE]);
                     avx_oweights = _mm512_mul_ps(avx_hidden, avx_oweights);
                     output_layer[o_idx] += _mm512_reduce_add_ps(avx_oweights);
                 }
-		o_idx++;
-		output_layer[o_idx++] = output_layer[o_idx - 1];
+		    o_idx++;
+		    output_layer[o_idx++] = output_layer[o_idx - 1];
             }
     }
 
@@ -165,14 +161,9 @@ void classification(float *output_layer) {
 
     for (int i = 0; i < instances; ++i) {
         for (int j = 0; j < output_size; ++j) {
-            sum_exp[i] += exp(output_layer[i * output_size + j]);
+            sum_exp[i] += expf(output_layer[i * output_size + j]);
         }
     }
-
-//	for (int i = 0; i < instances; ++i) {
-//		printf("%f ", sum_exp[i]);
-//	}
-//	printf("\n");
 
     for (int i = 0, j = 0; i < instances; i += AVX_SIZE/2, j += AVX_SIZE) {
         avx_sumexp = _mm512_setr_ps(sum_exp[i], sum_exp[i], sum_exp[i+1], sum_exp[i+1], sum_exp[i+2], sum_exp[i+2], 
@@ -195,39 +186,17 @@ void classification(float *output_layer) {
 }
 
 int main(int argc, char const *argv[]) {
-    total_begin = clock();
-
     instances = atoi(argv[1]);
     features = atoi(argv[2]);
     output_size = atoi(argv[3]);
 
-    // hidden_begin = clock();
     float *hidden_layer = relu_layer();
-    // hidden_end = clock();
-    // hidden_spent = (double)(hidden_end - hidden_begin) / CLOCKS_PER_SEC;
 
-    // output_begin = clock();
     float *output_layer = softmax_layer(hidden_layer);
-    // output_end = clock();
-    // output_spent = (double)(output_end - output_begin) / CLOCKS_PER_SEC;
 
-    // class_begin = clock();
     classification(output_layer);
-    // class_end = clock();
-    // class_spent = (double)(class_end - class_begin) / CLOCKS_PER_SEC;
-
-     total_end = clock();
-     total_spent = (double)(total_end - total_begin) / CLOCKS_PER_SEC;
-    // printf("*************************************\n");
-     printf("* Execution time:         %fs *\n", total_spent);
-    // printf(" ***********************************\n");
-    // printf("* Input x Hidden layer:   %fs *\n", hidden_spent);
-    // printf("* Hidden x Output layer:  %fs *\n", output_spent);
-    // printf("* Classification time:    %fs *\n", class_spent);
-    // printf("*************************************\n");
 
     free(hidden_layer);
-
     free(output_layer);
     free(bias);
     return 0;

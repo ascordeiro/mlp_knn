@@ -14,15 +14,11 @@ void initialize_weights(float *weights, int size) {
 }
 
 void read_instance(float *instance, int size) {
-    #pragma omp parallel
-    {
-	 __m512 avx_instance;
-        #pragma omp for schedule(static, 16)
-        for (int i = 0; i < size; i += AVX_SIZE) {
-            avx_instance = _mm512_load_ps(&instance[i]);
-            avx_instance = _mm512_set1_ps((float)1.0);
-            _mm512_store_ps(&instance[i], avx_instance);
-        }
+	__m512 avx_instance;
+    for (int i = 0; i < size; i += AVX_SIZE) {
+        avx_instance = _mm512_load_ps(&instance[i]);
+        avx_instance = _mm512_set1_ps((float)1.0);
+        _mm512_store_ps(&instance[i], avx_instance);
     }
 }
 
@@ -60,7 +56,7 @@ float *relu_layer() {
                         avx_weights = _mm512_load_ps(&h_weights[j * AVX_SIZE]);
                         avx_weights = _mm512_mul_ps(avx_base, avx_weights);
                         for (k = 0; k < 2; ++k) {
-                        hidden_layer[h_idx + k] = _mm512_mask_reduce_add_ps(avx_mask[k], avx_weights);
+                            hidden_layer[h_idx + k] = _mm512_mask_reduce_add_ps(avx_mask[k], avx_weights);
                     }
                 }
             }
@@ -247,36 +243,15 @@ void classification(float *output_layer) {
 }
 
 int main(int argc, char const *argv[]) {
-    total_begin = clock();
-
     instances = atoi(argv[1]);
     features = atoi(argv[2]);
     output_size = atoi(argv[3]);
 
-    // hidden_begin = clock();
     float *hidden_layer = relu_layer();
-    // hidden_end = clock();
-    // hidden_spent = (double)(hidden_end - hidden_begin) / CLOCKS_PER_SEC;
 
-    // output_begin = clock();
     float *output_layer = softmax_layer(hidden_layer);
-    // output_end = clock();
-    // output_spent = (double)(output_end - output_begin) / CLOCKS_PER_SEC;
 
-    // class_begin = clock();
     classification(output_layer);
-    // class_end = clock();
-    // class_spent = (double)(class_end - class_begin) / CLOCKS_PER_SEC;
-
-    total_end = clock();
-    total_spent = (double)(total_end - total_begin) / CLOCKS_PER_SEC;
-    // printf("*************************************\n");
-    printf("* Execution time:         %fs *\n", total_spent);
-    // printf(" ***********************************\n");
-    // printf("* Input x Hidden layer:   %fs *\n", hidden_spent);
-    // printf("* Hidden x Output layer:  %fs *\n", output_spent);
-    // printf("* Classification time:    %fs *\n", class_spent);
-    // printf("*************************************\n");
 
     free(hidden_layer);
     free(output_layer);
